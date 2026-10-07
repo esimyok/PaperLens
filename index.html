@@ -145,6 +145,9 @@
   td[data-key="title"]{font-weight:600;color:var(--title-strong);}
   .zh{font-weight:500;}
   .orig{display:block;color:var(--orig-text);font-size:11.5px;margin-top:2px;}
+  .orig.clamped{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+  .orig-toggle{display:block;border:0;background:none;color:var(--primary);font-size:11.5px;padding:0;margin-top:2px;cursor:pointer;}
+  .orig-toggle:hover{text-decoration:underline;}
 
   td{position:relative;}
   .ccopy{position:absolute;top:4px;right:4px;border:1px solid var(--border);background:var(--panel);color:var(--muted);
@@ -652,6 +655,7 @@ async function processRecord(rec, file){
 async function translateRec(rec){
   (async ()=>{
     if(busy) await waitTurn(); busy = true;
+    rec.translating = true; render();   // 立即反馈：状态列徽章 + 按钮变为「翻译中…」
     try{
       const src = JSON.stringify({ title: rec.title, one_sentence_summary: rec.one_sentence_summary, main_findings: rec.main_findings });
       const raw = await callAIWithRetry([
@@ -662,11 +666,13 @@ async function translateRec(rec){
       rec.title_zh = r.title_zh || "";
       rec.summary_zh = r.summary_zh || "";
       rec.findings_zh = r.findings_zh || "";
-      saveRecords(); render();
-      toast(`「${rec.filename}」翻译完成（标题/总结/结论已显示为中文）`, "ok");
+      toast(`「${rec.filename}」翻译完成（中文为主，原文折叠保留，可展开查看）`, "ok");
     }catch(err){
       toast(`翻译失败：${err.message}`, "err", 6000);
-    }finally{ busy = false; }
+    }finally{
+      rec.translating = false; busy = false;
+      saveRecords(); render();
+    }
   })();
 }
 
@@ -707,12 +713,18 @@ function refreshFilterOptions(){
 
 /* ============ 渲染 ============ */
 function statusBadge(rec){
+  if(rec.translating) return `<span class="status st-ai">翻译中…</span>`;
   const map = { parsing:["st-parsing", rec.statusText?`解析中（${rec.statusText}）`:"解析中"],
     ai:["st-ai","AI 分析中…"], done:["st-done","完成"], fail:["st-fail","失败"] };
   const [cls, label] = map[rec.status] || ["st-parsing","解析中"];
   let html = `<span class="status ${cls}">${esc(label)}</span>`;
   if(rec.status==="fail" && rec.errMsg) html += `<div class="err-msg">${esc(rec.errMsg)}</div>`;
   return html;
+}
+/* 翻译对照：中文为主，原文默认折叠 3 行，可展开 */
+function zhWithOrig(zh, orig){
+  return `<span class="zh">${esc(zh)}</span><span class="orig clamped">原文：${esc(orig)}</span>` +
+         `<button class="orig-toggle" type="button" title="展开 / 收起英文原文">展开原文 ▾</button>`;
 }
 function cellContent(rec, col){
   if(col.key==="status") return statusBadge(rec);
@@ -722,12 +734,12 @@ function cellContent(rec, col){
     if(col.tag) main = arr.map(x=>`<span class="tag">${esc(x)}</span>`).join("") || `<span class="empty-tip">未提及</span>`;
     else main = arr.map(esc).join("; ") || `<span class="empty-tip">未提及</span>`;
   }else if(col.key==="title" && rec.title_zh){
-    // 翻译对照：中文为主，原文小字保留
-    main = `<span class="zh">${esc(rec.title_zh)}</span><span class="orig">原文：${esc(rec.title)}</span>`;
+    // 翻译对照：中文为主，原文折叠可展开
+    return zhWithOrig(rec.title_zh, rec.title);
   }else if(col.key==="one_sentence_summary" && rec.summary_zh){
-    main = `<span class="zh">${esc(rec.summary_zh)}</span><span class="orig">原文：${esc(rec.one_sentence_summary)}</span>`;
+    return zhWithOrig(rec.summary_zh, rec.one_sentence_summary);
   }else if(col.key==="main_findings" && rec.findings_zh){
-    main = `<span class="zh">${esc(rec.findings_zh)}</span><span class="orig">原文：${esc(rec.main_findings)}</span>`;
+    return zhWithOrig(rec.findings_zh, rec.main_findings);
   }else{
     main = esc(rec[col.key]) || `<span class="empty-tip">未提及</span>`;
   }
@@ -768,7 +780,10 @@ function render(){
   tbody.innerHTML = list.map(rec=>`<tr data-id="${rec.id}" class="${selectedIds.has(rec.id)?"selected":""}">${
     cols.map(col=>{
       if(col.key==="ops"){
-        return `<td class="ops"><button class="btn small" data-act="reanalyze">重新分析</button><button class="btn small" data-act="translate">${rec.title_zh?"取消翻译":"翻译"}</button><button class="btn small" data-act="cite">引用 ▾</button><button class="btn small danger" data-act="delete">删除</button></td>`;
+        const tBtn = rec.translating
+          ? `<button class="btn small" disabled>翻译中…</button>`
+          : `<button class="btn small" data-act="translate">${rec.title_zh?"取消翻译":"翻译"}</button>`;
+        return `<td class="ops"><button class="btn small" data-act="reanalyze">重新分析</button>${tBtn}<button class="btn small" data-act="cite">引用 ▾</button><button class="btn small danger" data-act="delete">删除</button></td>`;
       }
       const ed = col.editable===false ? "" : " editable";
       const cc = col.key==="status" ? "" : `<button class="ccopy" title="复制本格">⧉</button>`;
@@ -865,6 +880,16 @@ $("#tbody").addEventListener("click", e=>{
     return;
   }
   if(e.target.closest("#btn-sample")){ loadSamples(); return; }
+  if(e.target.closest(".orig-toggle")){
+    // 展开 / 收起原文
+    const td = e.target.closest("td");
+    const o = td && td.querySelector(".orig");
+    if(o){
+      const clamped = o.classList.toggle("clamped");
+      e.target.textContent = clamped ? "展开原文 ▾" : "收起原文 ▴";
+    }
+    return;
+  }
   if(e.target.closest(".ccopy")){
     const td = e.target.closest("td");
     if(td && td.dataset.raw) copyText(td.dataset.raw, "已复制单元格内容");
