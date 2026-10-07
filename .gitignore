@@ -7,7 +7,7 @@ build/
 dist/
 
 # 打包出的可执行文件不入库
-PaperLens.exe
+SiftLit.exe
 
 # 本地运行残留
 wecom_sync_pending.jsonl

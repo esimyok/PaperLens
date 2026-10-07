@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-PaperLens 一键版：本地服务 + Zotero 桥接 + 自动打开页面（三合一）
+SiftLit 一键版：本地服务 + Zotero 桥接 + 自动打开页面（三合一）
 ================================================================
-双击 PaperLens.exe 后：
+双击 SiftLit.exe 后：
   1. 启动本机服务 http://127.0.0.1:3002 并自动打开工具页面
   2. 页面自动开启「Zotero 联动」——在 Zotero 点选文献即自动分析
 关闭控制台窗口即退出。
@@ -82,7 +82,7 @@ def origin_ok(handler):
 def http_get(url, timeout=90):
     """GET 下载；打包环境常缺 CA 根证书，证书校验失败时降级重试一次
     （仅用于按精确 id 从 arxiv.org 下载公开 PDF，内容只喂给前端 PDF.js 解析）"""
-    req = urllib.request.Request(url, headers={"User-Agent": "PaperLens/1.1"})
+    req = urllib.request.Request(url, headers={"User-Agent": "SiftLit/1.1"})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return r.read()
@@ -311,7 +311,7 @@ def main():
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
-    no_open = os.environ.get("PAPERLENS_NO_BROWSER") == "1" or "--no-open" in sys.argv
+    no_open = (os.environ.get("SIFTLIT_NO_BROWSER") == "1" or os.environ.get("PAPERLENS_NO_BROWSER") == "1") or "--no-open" in sys.argv
     srv = None
     for port in range(PORT, PORT + 10):
         try:
@@ -320,12 +320,12 @@ def main():
         except OSError:
             continue
     if srv is None:
-        print("端口均被占用，请关闭旧的 PaperLens 窗口后重试")
+        print("端口均被占用，请关闭旧的 SiftLit 窗口后重试")
         return
     url = "http://127.0.0.1:%d/" % srv.server_address[1]
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     print("=" * 52)
-    print("PaperLens 已启动")
+    print("SiftLit 已启动")
     print("  页面: %s   （已自动打开浏览器）" % url)
     print("  Zotero 联动: 页面会自动检测并开启")
     print("  关闭本窗口即退出服务")

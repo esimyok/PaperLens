@@ -1,8 +1,8 @@
-PaperLens · 文献智能提炼表格 —— 使用说明
+SiftLit · 文献智能提炼表格 —— 使用说明
 ================================================
 
-一、快速开始（推荐：双击 PaperLens.exe）
-1. 双击 PaperLens.exe：自动启动本地服务并打开浏览器页面，
+一、快速开始（推荐：双击 SiftLit.exe）
+1. 双击 SiftLit.exe：自动启动本地服务并打开浏览器页面，
    检测到 Zotero 在运行时会自动开启「Zotero 联动」。
    关闭黑色控制台窗口即退出服务。
 2. 首次使用点右上角「⚙ 设置」，填入智谱 API Key
@@ -50,7 +50,7 @@ PaperLens · 文献智能提炼表格 —— 使用说明
      （等价操作：设置 -> 高级 -> 配置编辑器，搜索 localAPI，切为 true）
   3. Better BibTeX 插件（你已装好）。若 Zotero 启动时弹
      "Better BibTex startup failed: TimeoutError"，重启一次 Zotero 即可恢复。
-都完成后：双击 PaperLens.exe -> 在 Zotero 点选文献 -> 自动分析。
+都完成后：双击 SiftLit.exe -> 在 Zotero 点选文献 -> 自动分析。
 没有 PDF 附件的条目会提示跳过；联动只访问本机 Zotero，不联网上传数据。
 
 四、CORS 兜底：本地代理模式
@@ -84,7 +84,7 @@ PaperLens · 文献智能提炼表格 —— 使用说明
 - 示例数据：空表状态可一键加载 3 篇真实经典论文试用
 
 七、文件清单
-- PaperLens.exe   一键启动（服务 + Zotero 联动 + 自动开页面）
+- SiftLit.exe   一键启动（服务 + Zotero 联动 + 自动开页面）
 - app.py          exe 的源码（Python，零第三方依赖）
 - index.html      主页面（也被 exe 内置打包）
 - proxy.js        CORS 兜底代理（支持各服务商通用转发）

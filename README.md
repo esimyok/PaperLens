@@ -1,24 +1,24 @@
-<p align="center"><img src="docs/logo-square.png" width="120" alt="PaperLens logo"></p>
+<p align="center"><img src="docs/logo-square.png" width="120" alt="SiftLit logo"></p>
 
-# PaperLens 🔍 · 文献智能提炼表格
+# SiftLit 🔍 · 文献智能提炼表格
 
 > 把文献 PDF 拖进浏览器，AI 自动提炼成一张结构化表格：研究问题、方法、数据样本、主要结论、创新点、局限性……一目了然。
 
 ![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue) ![license](https://img.shields.io/badge/license-MIT-green) ![deps](https://img.shields.io/badge/服务端依赖-零-orange)
 
-![PaperLens 界面截图](docs/screenshot-main.png)
+![SiftLit 界面截图](docs/screenshot-main.png)
 
 深色模式：
 
-![PaperLens 深色模式](docs/screenshot-dark.png)
+![SiftLit 深色模式](docs/screenshot-dark.png)
 
 多 AI 服务商配置——每家的 Key 和模型分别保存，随时切换：
 
-![PaperLens 设置截图](docs/screenshot-settings.png)
+![SiftLit 设置截图](docs/screenshot-settings.png)
 
 ## 这是什么
 
-读文献时经常需要把几十篇论文整理成文献综述表格（研究问题 / 方法 / 结论……），逐篇手摘非常耗时。PaperLens 把这件事压缩成两步：**拖入 PDF → AI 提炼**，并在本地浏览器里生成可编辑、可筛选、可导出的表格。
+读文献时经常需要把几十篇论文整理成文献综述表格（研究问题 / 方法 / 结论……），逐篇手摘非常耗时。SiftLit 把这件事压缩成两步：**拖入 PDF → AI 提炼**，并在本地浏览器里生成可编辑、可筛选、可导出的表格。
 
 - **纯本地运行**：只有一个本地静态服务，分析结果存在浏览器 localStorage，不上传任何服务器；
 - **自带 API Key**：直接在浏览器里调用你自己的大模型 API Key（支持 6 家服务商），密钥只存在本机；
@@ -46,7 +46,7 @@
 
 ### 方式一：下载 exe（推荐，Windows）
 
-到 [Releases](../../releases) 页面下载 `PaperLens.exe`，双击即用：
+到 [Releases](../../releases) 页面下载 `SiftLit.exe`，双击即用：
 
 1. 自动启动本地服务并打开工具页面
 2. 右上角「⚙ 设置」填入任一服务商的 API Key（如 [智谱 GLM](https://open.bigmodel.cn)，glm-4-flash 系列免费）
@@ -57,8 +57,8 @@
 需要 Python 3.8+（服务端零第三方依赖）：
 
 ```bash
-git clone https://github.com/esimyok/PaperLens.git
-cd PaperLens
+git clone https://github.com/esimyok/SiftLit.git
+cd SiftLit
 python app.py        # 自动打开 http://127.0.0.1:3002
 ```
 
@@ -78,7 +78,7 @@ python app.py        # 自动打开 http://127.0.0.1:3002
    然后重启 Zotero（等价操作：设置 → 高级 → 配置编辑器，搜索 `localAPI`，切为 `true`）
 3. 安装 [Better BibTeX](https://retorque.re/zotero-bibtex/) 插件（仅用于读取"当前选中项"）
 
-完成后双击 `PaperLens.exe`，在 Zotero 里点选文献，约 2~3 秒后自动开始分析。联动只访问本机 Zotero，数据不出本机。
+完成后双击 `SiftLit.exe`，在 Zotero 里点选文献，约 2~3 秒后自动开始分析。联动只访问本机 Zotero，数据不出本机。
 
 ## 🌐 CORS 兜底代理
 
@@ -92,13 +92,13 @@ node proxy.js       # 监听 localhost:3001，支持各服务商通用转发
 ## 📁 目录结构
 
 ```
-PaperLens/
+SiftLit/
 ├── app.py                 # 本地服务 + Zotero 桥接（Python 标准库实现，零依赖）
 ├── index.html             # 主页面：表格 / 筛选 / 编辑 / 翻译 / 问答 / 设置（单文件，无构建）
 ├── proxy.js               # CORS 兜底代理（Node + Express，可选）
 ├── 使用说明.txt            # 面向 exe 用户的离线说明
 ├── packaging/
-│   └── PaperLens.spec     # PyInstaller 打包配置
+│   └── SiftLit.spec     # PyInstaller 打包配置
 └── docs/                  # 截图等文档资源
 ```
 
@@ -106,10 +106,10 @@ PaperLens/
 
 ```bash
 pip install pyinstaller
-python -m PyInstaller packaging/PaperLens.spec --distpath . --workpath build --noconfirm
+python -m PyInstaller packaging/SiftLit.spec --distpath . --workpath build --noconfirm
 ```
 
-生成单文件 `PaperLens.exe`（内嵌 index.html，拷走即可用）。
+生成单文件 `SiftLit.exe`（内嵌 index.html，拷走即可用）。
 
 ## 🔒 隐私与数据
 
