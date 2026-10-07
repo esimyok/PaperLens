@@ -291,7 +291,7 @@ const MAX_CHARS = 60000;
 const PROXY_BASE = "http://localhost:3001";
 const SYSTEM_PROMPT = "你是学术论文分析助手。请从用户提供的文献文本中提取结构化信息，严格只输出一个 JSON 对象，不要输出任何其他文字、解释或 markdown 代码块。若某字段无法从文本中找到，填写\"未提及\"。keywords 为 3-6 个字符串组成的数组，authors 为字符串数组。禁止虚构内容。";
 const JSON_SCHEMA_HINT = '\n\n请严格按以下 JSON Schema 输出（所有字段必须存在）：\n{"title":"","authors":[],"year":"","keywords":[],"research_question":"","methodology":"","data_and_sample":"","main_findings":"","innovation":"","limitations":"","one_sentence_summary":""}';
-const TRANSLATE_PROMPT = "你是学术文献翻译助手。用户会给你一个 JSON，请把其中 title、one_sentence_summary、main_findings 全部翻译成简体中文（专业术语准确、语句通顺）。严格只输出一个 JSON 对象：{\"title_zh\":\"...\",\"summary_zh\":\"...\",\"findings_zh\":\"...\"}，三个字段都必须存在，不要输出任何其他文字或 markdown 代码块。禁止编造。";
+const TRANSLATE_PROMPT = "你是学术文献翻译助手。用户会给你一个 JSON，请把其中 title、one_sentence_summary、main_findings、research_question、methodology 全部翻译成简体中文（专业术语准确、语句通顺）。严格只输出一个 JSON 对象：{\"title_zh\":\"...\",\"summary_zh\":\"...\",\"findings_zh\":\"...\",\"rq_zh\":\"...\",\"method_zh\":\"...\"}，五个字段都必须存在，不要输出任何其他文字或 markdown 代码块。禁止编造。";
 const CHAT_PROMPT = "你是学术论文问答助手。请只依据下面提供的文献内容回答用户问题，用中文、简洁准确；文献中没有的信息要明确回答\"文献中未提及\"，禁止编造。\n\n===== 文献内容 =====\n";
 const CHAT_PROMPT_MULTI = "你是学术论文问答助手。用户提供了多篇文献的内容，请综合对比这些文献回答问题，用中文、简洁准确；可以指出文献之间的异同；文献中没有的信息要明确回答\"文献中未提及\"，禁止编造。\n\n===== 文献内容 =====\n";
 
@@ -515,7 +515,7 @@ async function callAIOnce(messages, json, viaProxy){
     url = base + "/messages";
     headers = { "Content-Type":"application/json", "x-api-key":cfg.key,
       "anthropic-version":"2023-06-01", "anthropic-dangerous-direct-browser-access":"true" };
-    body = { model:cfg.model, max_tokens:2000, temperature:0.2,
+    body = { model:cfg.model, max_tokens:4000, temperature:0.2,
       system: (messages.find(m=>m.role==="system")||{}).content || "",
       messages: messages.filter(m=>m.role!=="system") };
     parse = d => (d.content && d.content[0] && d.content[0].text) || "";
@@ -657,7 +657,8 @@ async function translateRec(rec){
     if(busy) await waitTurn(); busy = true;
     rec.translating = true; render();   // 立即反馈：状态列徽章 + 按钮变为「翻译中…」
     try{
-      const src = JSON.stringify({ title: rec.title, one_sentence_summary: rec.one_sentence_summary, main_findings: rec.main_findings });
+      const src = JSON.stringify({ title: rec.title, one_sentence_summary: rec.one_sentence_summary,
+        main_findings: rec.main_findings, research_question: rec.research_question, methodology: rec.methodology });
       const raw = await callAIWithRetry([
         {role:"system", content: TRANSLATE_PROMPT},
         {role:"user", content: src}
@@ -666,7 +667,9 @@ async function translateRec(rec){
       rec.title_zh = r.title_zh || "";
       rec.summary_zh = r.summary_zh || "";
       rec.findings_zh = r.findings_zh || "";
-      toast(`「${rec.filename}」翻译完成（中文为主，原文折叠保留，可展开查看）`, "ok");
+      rec.rq_zh = r.rq_zh || "";
+      rec.method_zh = r.method_zh || "";
+      toast(`「${rec.filename}」翻译完成（标题/研究问题/方法/结论/总结，原文折叠保留）`, "ok");
     }catch(err){
       toast(`翻译失败：${err.message}`, "err", 6000);
     }finally{
@@ -733,6 +736,10 @@ function cellContent(rec, col){
     const arr = Array.isArray(rec[col.key])?rec[col.key]:[rec[col.key]];
     if(col.tag) main = arr.map(x=>`<span class="tag">${esc(x)}</span>`).join("") || `<span class="empty-tip">未提及</span>`;
     else main = arr.map(esc).join("; ") || `<span class="empty-tip">未提及</span>`;
+  }else if(col.key==="research_question" && rec.rq_zh){
+    return zhWithOrig(rec.rq_zh, rec.research_question);
+  }else if(col.key==="methodology" && rec.method_zh){
+    return zhWithOrig(rec.method_zh, rec.methodology);
   }else if(col.key==="title" && rec.title_zh){
     // 翻译对照：中文为主，原文折叠可展开
     return zhWithOrig(rec.title_zh, rec.title);
@@ -752,6 +759,8 @@ function cellRaw(rec, col){
     return arr.filter(x=>x && x!=="未提及").join("; ");
   }
   if(col.key==="title" && rec.title_zh) return rec.title_zh + "\n" + rec.title;
+  if(col.key==="research_question" && rec.rq_zh) return rec.rq_zh + "\n" + rec.research_question;
+  if(col.key==="methodology" && rec.method_zh) return rec.method_zh + "\n" + rec.methodology;
   if(col.key==="one_sentence_summary" && rec.summary_zh) return rec.summary_zh + "\n" + rec.one_sentence_summary;
   if(col.key==="main_findings" && rec.findings_zh) return rec.findings_zh + "\n" + rec.main_findings;
   return String(rec[col.key] ?? "");
@@ -861,8 +870,9 @@ $("#tbody").addEventListener("click", e=>{
         }finally{ busy=false; saveRecords(); render(); }
       })();
     }else if(btn.dataset.act==="translate"){
-      if(rec.title_zh || rec.summary_zh || rec.findings_zh){
+      if(rec.title_zh || rec.summary_zh || rec.findings_zh || rec.rq_zh || rec.method_zh){
         delete rec.title_zh; delete rec.summary_zh; delete rec.findings_zh;
+        delete rec.rq_zh; delete rec.method_zh;
         saveRecords(); render();
         toast("已取消翻译，恢复英文原文", "ok", 1500);
       }else{
@@ -1392,7 +1402,7 @@ $("#btn-stats").addEventListener("click", ()=>{
   if(records.length===0){ toast("暂无数据，先导入几篇文献再看统计", "warn"); return; }
   const done = records.filter(r=>r.status==="done").length;
   const fail = records.filter(r=>r.status==="fail").length;
-  const translated = records.filter(r=>r.title_zh || r.summary_zh).length;
+  const translated = records.filter(r=>r.title_zh || r.summary_zh || r.findings_zh || r.rq_zh || r.method_zh).length;
   const summary = `<div class="stats-summary">共 ${records.length} 篇 · 完成 ${done} · 失败 ${fail} · 已翻译 ${translated}</div>`;
   const yearCount = {};
   for(const r of records){
