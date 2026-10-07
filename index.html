@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="PaperLens —— 本地文献智能提炼表格：拖入 PDF，AI 自动提取研究问题、方法、结论等结构化字段，支持 Zotero 联动、文献问答、中英翻译与 CSV 导出。数据仅存本机。">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔍</text></svg>">
+<title>PaperLens · 文献智能提炼表格</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+  :root{
+    --bg:#f5f6f8; --panel:#ffffff; --border:#e2e5ea; --text:#1f2430; --muted:#6b7280;
+    --primary:#4f6ef2; --primary-dark:#3d57c9; --ok:#16a34a; --warn:#d97706; --err:#dc2626;
+    --chip-bg:#eef1fe; --chip-text:#3d57c9;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;}
+  header{background:var(--panel);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:10;}
+  header h1{font-size:18px;font-weight:700;margin-right:auto;}
+  header h1 span{color:var(--primary);}
+  .btn{border:1px solid var(--border);background:var(--panel);color:var(--text);padding:7px 14px;border-radius:8px;cursor:pointer;font-size:13px;transition:.15s;}
+  .btn:hover{border-color:var(--primary);color:var(--primary);}
+  .btn.primary{background:var(--primary);border-color:var(--primary);color:#fff;}
+  .btn.primary:hover{background:var(--primary-dark);}
+  .btn.small{padding:3px 9px;font-size:12px;border-radius:6px;}
+  .btn.danger:hover{border-color:var(--err);color:var(--err);}
+  main{padding:16px 24px;max-width:100%;}
+
+  #dropzone{border:1px dashed #c3c9d4;border-radius:10px;background:var(--panel);padding:10px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:.2s;margin-bottom:12px;}
+  #dropzone:hover,#dropzone.dragover{border-color:var(--primary);background:#f7f9ff;}
+  #dropzone .icon{font-size:20px;flex:none;}
+  #dropzone .dz-text{flex:1;min-width:0;}
+  #dropzone .main-line{font-size:13.5px;font-weight:600;}
+  #dropzone .sub-line{color:var(--muted);font-size:12px;margin-top:2px;}
+  #btn-zotero{flex:none;}
+  #btn-zotero[data-state="on"]{color:var(--ok);border-color:var(--ok);}
+  #btn-zotero[data-state="err"]{color:var(--err);border-color:var(--err);}
+
+  /* 筛选工具栏 */
+  #toolbar{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;}
+  #toolbar input,#toolbar select{border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:13px;background:var(--panel);}
+  #toolbar input:focus,#toolbar select:focus{outline:none;border-color:var(--primary);}
+  #f-q{flex:1;min-width:180px;}
+  #f-count{font-size:12px;color:var(--muted);}
+
+  .table-wrap{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:auto;max-height:calc(100vh - 250px);}
+  table{border-collapse:collapse;width:100%;min-width:1600px;}
+  th{position:sticky;top:0;background:#f0f2f6;font-size:12.5px;color:#3a4150;padding:9px 10px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;z-index:2;}
+  td{padding:8px 10px;border-bottom:1px solid #eef0f4;vertical-align:top;font-size:13px;line-height:1.55;word-break:break-word;min-width:90px;max-width:230px;}
+  td.editable{cursor:cell;}
+  td.editable:hover{background:#f6f8ff;}
+  tr[data-id]{cursor:pointer;}
+  tr.selected{background:#eef3ff;}
+  tr.selected td.editable:hover{background:#e2ebff;}
+  td textarea.cell-editor{width:100%;min-width:160px;min-height:64px;font:inherit;padding:4px;border:2px solid var(--primary);border-radius:6px;resize:vertical;}
+  .empty-tip{color:var(--muted);}
+  .tag{display:inline-block;background:var(--chip-bg);color:var(--chip-text);border-radius:10px;padding:1px 8px;font-size:12px;margin:2px 3px 2px 0;white-space:nowrap;}
+  .status{display:inline-block;padding:2px 9px;border-radius:10px;font-size:12px;white-space:nowrap;}
+  .st-parsing{background:#fff7e6;color:var(--warn);}
+  .st-ai{background:#e8f0fe;color:var(--primary);}
+  .st-done{background:#e8f7ee;color:var(--ok);}
+  .st-fail{background:#fdecec;color:var(--err);}
+  .err-msg{color:var(--err);font-size:12px;margin-top:4px;}
+  .ops{white-space:nowrap;min-width:150px;}
+  .ops .btn{margin-right:6px;margin-bottom:4px;}
+
+  /* 设置弹窗 */
+  .modal-mask{position:fixed;inset:0;background:rgba(20,24,34,.45);display:none;align-items:center;justify-content:center;z-index:100;}
+  .modal-mask.show{display:flex;}
+  .modal{background:var(--panel);border-radius:14px;padding:24px 26px;width:440px;box-shadow:0 12px 40px rgba(0,0,0,.18);max-height:88vh;overflow:auto;}
+  .modal h2{font-size:16px;margin-bottom:16px;}
+  .modal label{display:block;font-size:13px;color:var(--muted);margin:14px 0 6px;}
+  .modal input[type=password],.modal input[type=text],.modal select{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--panel);}
+  .modal input:focus,.modal select:focus{outline:none;border-color:var(--primary);}
+  .modal .hint{font-size:12px;color:var(--muted);margin-top:5px;line-height:1.5;}
+  .modal .foot{margin-top:20px;display:flex;justify-content:flex-end;gap:10px;}
+  .modal .proxy-line{margin-top:14px;font-size:12.5px;background:#f6f8ff;border:1px solid #dfe6ff;border-radius:8px;padding:8px 10px;color:#3d57c9;display:none;}
+  .modal .proxy-line.show{display:block;}
+
+  /* 对话侧边栏 */
+  #chat-panel{position:fixed;top:57px;right:0;bottom:0;width:380px;background:var(--panel);border-left:1px solid var(--border);display:flex;flex-direction:column;z-index:60;transform:translateX(105%);transition:transform .25s;box-shadow:-8px 0 24px rgba(0,0,0,.07);}
+  #chat-panel.open{transform:none;}
+  .chat-head{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);background:#fafbfd;}
+  .chat-head .t{flex:1;min-width:0;}
+  .chat-head .t b{font-size:14px;}
+  .chat-paper{font-size:12px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #chat-msgs{flex:1;overflow:auto;display:flex;flex-direction:column;padding:10px;}
+  .msg{max-width:86%;padding:8px 12px;border-radius:12px;margin:4px 0;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;}
+  .msg.user{align-self:flex-end;background:var(--primary);color:#fff;border-bottom-right-radius:4px;}
+  .msg.ai{align-self:flex-start;background:#f0f2f6;border-bottom-left-radius:4px;}
+  .msg.ai.md{white-space:normal;}
+  .msg.ai.md p{margin:4px 0;}
+  .msg.ai.md h4{margin:8px 0 4px;font-size:13.5px;}
+  .msg.ai.md ul,.msg.ai.md ol{margin:4px 0 4px 18px;}
+  .msg.ai.md li{margin:2px 0;}
+  .msg.ai.md pre.codeblock{background:#1f2430;color:#e8ecf5;border-radius:8px;padding:8px 10px;margin:6px 0;overflow:auto;font-size:12px;line-height:1.5;}
+  .msg.ai.md pre.codeblock code{font-family:Consolas,monospace;white-space:pre;}
+  .msg.ai.md code.inlinecode{background:#e2e5ee;color:#c2452d;border-radius:4px;padding:1px 5px;font-family:Consolas,monospace;font-size:12px;}
+  .msg.ai.md table{border-collapse:collapse;margin:6px 0;font-size:12.5px;}
+  .msg.ai.md th,.msg.ai.md td{border:1px solid #c9ced9;padding:3px 8px;}
+  .msg.ai.thinking{color:var(--muted);}
+  .chat-modelbar{display:flex;gap:6px;align-items:center;padding:8px 10px;border-top:1px solid var(--border);background:#fafbfd;}
+  .chat-modelbar select,.chat-modelbar input{flex:1;min-width:0;border:1px solid var(--border);border-radius:8px;padding:5px 6px;font-size:12.5px;background:var(--panel);color:var(--text);}
+  .chat-modelbar select:focus,.chat-modelbar input:focus{outline:none;border-color:var(--primary);}
+  .chat-modelbar .btn{flex:none;}
+  .chat-empty{margin:auto;color:var(--muted);font-size:13px;text-align:center;line-height:1.8;padding:0 20px;}
+  .chat-input{display:flex;gap:8px;padding:10px;border-top:1px solid var(--border);}
+  #chat-in{flex:1;resize:none;height:64px;border:1px solid var(--border);border-radius:8px;padding:8px;font:inherit;font-size:13px;}
+  #chat-in:focus{outline:none;border-color:var(--primary);}
+
+  #toast-box{position:fixed;top:18px;right:18px;z-index:200;display:flex;flex-direction:column;gap:8px;}
+  .toast{background:#2b3140;color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;box-shadow:0 6px 18px rgba(0,0,0,.25);max-width:360px;animation:slidein .25s;}
+  .toast.ok{background:var(--ok);} .toast.err{background:var(--err);} .toast.warn{background:var(--warn);}
+  @keyframes slidein{from{transform:translateX(30px);opacity:0;}to{transform:none;opacity:1;}}
+  #global-progress{font-size:12.5px;color:var(--primary);margin-bottom:8px;min-height:18px;}
+</style>
+</head>
+<body>
+<header>
+  <h1>PaperLens <span>· 文献智能提炼表格</span></h1>
+  <button class="btn" id="btn-chat">💬 问答</button>
+  <button class="btn" id="btn-zotero" data-state="off" title="开启后在 Zotero 中选中文献，本页自动抓取并分析">🔌 Zotero 联动：关</button>
+  <button class="btn" id="btn-export">导出 CSV</button>
+  <button class="btn" id="btn-settings">⚙ 设置</button>
+</header>
+<main>
+  <div id="dropzone">
+    <div class="icon">📄</div>
+    <div class="dz-text">
+      <div class="main-line">将 PDF 拖到此处，或点击选择文件（可多选）</div>
+      <div class="sub-line">仅支持 .pdf（需含文字层，暂不支持扫描件）· 点击表格行可在「问答」中针对该文献提问</div>
+    </div>
+  </div>
+  <input type="file" id="file-input" accept=".pdf" multiple hidden>
+  <div id="toolbar">
+    <input id="f-q" placeholder="🔍 搜索：标题 / 作者 / 关键词 / 内容…">
+    <select id="f-year"><option value="all">年份：全部</option></select>
+    <select id="f-kw"><option value="all">关键词：全部</option></select>
+    <select id="f-status">
+      <option value="all">状态：全部</option>
+      <option value="done">完成</option>
+      <option value="fail">失败</option>
+      <option value="ai">AI 分析中</option>
+      <option value="parsing">解析中</option>
+    </select>
+    <button class="btn small" id="f-clear">清除筛选</button>
+    <span id="f-count"></span>
+  </div>
+  <div id="global-progress"></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr id="thead-row"></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</main>
+
+<div class="modal-mask" id="settings-mask">
+  <div class="modal">
+    <h2>设置</h2>
+    <label>AI 服务商</label>
+    <select id="inp-provider"></select>
+    <label>API Key（当前服务商）</label>
+    <input type="password" id="inp-key" placeholder="请输入 API Key，仅保存在本机浏览器 localStorage">
+    <div class="hint" id="key-hint"></div>
+    <label>模型（直接手动输入即可，下拉仅为常用建议）</label>
+    <input type="text" id="inp-model" list="model-list" placeholder="模型名">
+    <datalist id="model-list"></datalist>
+    <div class="proxy-line" id="proxy-line">⚠ 浏览器直连智谱失败（CORS），已自动切换为「本地代理模式」。<br>请先在工具目录运行：<b>node proxy.js</b>（需 npm install express）</div>
+    <div class="foot">
+      <button class="btn" id="btn-cancel">取消</button>
+      <button class="btn primary" id="btn-save">保存</button>
+    </div>
+  </div>
+</div>
+
+<div id="chat-panel">
+  <div class="chat-head">
+    <div class="t">
+      <b>💬 文献问答</b>
+      <div class="chat-paper" id="chat-paper">未选择文献 —— 点击表格任意一行</div>
+    </div>
+    <button class="btn small" id="chat-clear">清空</button>
+    <button class="btn small" id="chat-close">收起 ▶</button>
+  </div>
+  <div id="chat-msgs"></div>
+  <div class="chat-modelbar">
+    <select id="chat-provider" title="切换 AI 服务商"></select>
+    <input id="chat-model" list="chat-model-list" placeholder="模型名，可手动输入">
+    <datalist id="chat-model-list"></datalist>
+    <button class="btn small" id="chat-manage">管理模型</button>
+  </div>
+  <div class="chat-input">
+    <textarea id="chat-in" placeholder="基于选中的文献提问…&#10;Enter 发送，Shift+Enter 换行"></textarea>
+    <button class="btn primary" id="chat-send">发送</button>
+  </div>
+</div>
+<div id="toast-box"></div>
+
+<script>
+"use strict";
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+/* ============ 常量 ============ */
+const LS_KEY = "paperlens_records";
+const LS_SETTINGS = "paperlens_settings";
+const MAX_CHARS = 60000;
+const PROXY_BASE = "http://localhost:3001";
+const SYSTEM_PROMPT = "你是学术论文分析助手。请从用户提供的文献文本中提取结构化信息，严格只输出一个 JSON 对象，不要输出任何其他文字、解释或 markdown 代码块。若某字段无法从文本中找到，填写\"未提及\"。keywords 为 3-6 个字符串组成的数组，authors 为字符串数组。禁止虚构内容。";
+const JSON_SCHEMA_HINT = '\n\n请严格按以下 JSON Schema 输出（所有字段必须存在）：\n{"title":"","authors":[],"year":"","keywords":[],"research_question":"","methodology":"","data_and_sample":"","main_findings":"","innovation":"","limitations":"","one_sentence_summary":""}';
+const TRANSLATE_PROMPT = "你是学术文献翻译助手。用户会给你一个 JSON，请把其中 title、one_sentence_summary、main_findings 全部翻译成简体中文（专业术语准确、语句通顺）。严格只输出一个 JSON 对象：{\"title_zh\":\"...\",\"summary_zh\":\"...\",\"findings_zh\":\"...\"}，三个字段都必须存在，不要输出任何其他文字或 markdown 代码块。禁止编造。";
+const CHAT_PROMPT = "你是学术论文问答助手。请只依据下面提供的文献内容回答用户问题，用中文、简洁准确；文献中没有的信息要明确回答\"文献中未提及\"，禁止编造。\n\n===== 文献内容 =====\n";
+
+const PROVIDERS = {
+  glm:     {name:"智谱 GLM",   base:"https://open.bigmodel.cn/api/paas/v4",                style:"openai",    json:true,  models:["glm-4-flash-250414","glm-4.7-flash","glm-4.6","glm-4-plus"], hint:"https://open.bigmodel.cn（glm-4-flash 系列免费）"},
+  deepseek:{name:"DeepSeek",   base:"https://api.deepseek.com",                            style:"openai",    json:true,  models:["deepseek-chat","deepseek-reasoner"], hint:"https://platform.deepseek.com"},
+  qwen:    {name:"通义千问",    base:"https://dashscope.aliyuncs.com/compatible-mode/v1",   style:"openai",    json:true,  models:["qwen-plus","qwen-turbo","qwen-max","qwen3-max"], hint:"https://bailian.console.aliyun.com（开通模型服务后创建 API Key）"},
+  openai:  {name:"OpenAI GPT", base:"https://api.openai.com/v1",                           style:"openai",    json:true,  models:["gpt-4o-mini","gpt-4o","gpt-4.1-mini"], hint:"https://platform.openai.com/api-keys"},
+  gemini:  {name:"Google Gemini", base:"https://generativelanguage.googleapis.com/v1beta/openai", style:"openai", json:true, models:["gemini-2.5-flash","gemini-2.5-pro","gemini-2.0-flash"], hint:"https://aistudio.google.com/apikey（走 OpenAI 兼容接口）"},
+  claude:  {name:"Anthropic Claude", base:"https://api.anthropic.com/v1",                   style:"anthropic", json:false, models:["claude-sonnet-4-5","claude-haiku-4-5","claude-opus-4-1"], hint:"https://console.anthropic.com/settings/keys"},
+};
+
+const COLUMNS = [
+  {key:"filename", label:"文件名", editable:false},
+  {key:"title", label:"标题"},
+  {key:"authors", label:"作者", type:"list"},
+  {key:"year", label:"年份"},
+  {key:"keywords", label:"关键词", type:"list", tag:true},
+  {key:"research_question", label:"研究问题"},
+  {key:"methodology", label:"研究方法"},
+  {key:"data_and_sample", label:"数据/样本"},
+  {key:"main_findings", label:"主要结论"},
+  {key:"innovation", label:"创新点"},
+  {key:"limitations", label:"局限性"},
+  {key:"one_sentence_summary", label:"一句话总结"},
+  {key:"status", label:"状态", editable:false},
+  {key:"ops", label:"操作", editable:false},
+];
+
+/* ============ 状态 ============ */
+let records = [];
+let settings = { provider:"glm", providers:{}, proxyMode:false, zotero:true };
+let busy = false;         // 顺序处理锁：同一时刻只发 1 个请求
+let selectedId = null;    // 当前对话选中的文献行
+let chatHistories = {};   // recordId -> [{role, content}]
+let chatBusy = false;
+let filters = { q:"", year:"all", kw:"all", status:"all" };
+
+/* ============ 工具函数 ============ */
+const $ = s => document.querySelector(s);
+function esc(s){ return String(s??"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function toast(msg, type="", ms=4000){
+  const t=document.createElement("div"); t.className="toast "+type; t.textContent=msg;
+  $("#toast-box").appendChild(t); setTimeout(()=>t.remove(), ms);
+}
+function loadState(){
+  try{ records = JSON.parse(localStorage.getItem(LS_KEY)) || []; }catch(e){ records=[]; }
+  try{ Object.assign(settings, JSON.parse(localStorage.getItem(LS_SETTINGS)) || {}); }catch(e){}
+  // 旧版单 Key 配置迁移到 glm
+  if(settings.apiKey && !(settings.providers && settings.providers.glm)){
+    settings.providers = settings.providers || {};
+    settings.providers.glm = { key: settings.apiKey, model: settings.model || PROVIDERS.glm.models[0] };
+  }
+  settings.provider = settings.provider || "glm";
+  settings.providers = settings.providers || {};
+}
+function saveRecords(){ localStorage.setItem(LS_KEY, JSON.stringify(records)); }
+function saveSettings(){ localStorage.setItem(LS_SETTINGS, JSON.stringify(settings)); }
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+function waitTurn(){
+  return new Promise(res=>{
+    const timer = setInterval(()=>{ if(!busy){ clearInterval(timer); res(); } }, 200);
+  });
+}
+
+/* ============ PDF 解析 ============ */
+async function extractPdfText(file, onProgress){
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+  const total = pdf.numPages;
+  let text = "";
+  for(let i=1;i<=total;i++){
+    onProgress(i, total);
+    const page = await pdf.getPage(i);
+    const tc = await page.getTextContent();
+    text += tc.items.map(it=>it.str).join(" ") + "\n";
+  }
+  text = text.replace(/[ \t]+/g," ").replace(/\n{3,}/g,"\n\n").trim();
+  return { text, pages: total };
+}
+function truncateText(t){
+  if(t.length <= MAX_CHARS) return t;
+  const head = Math.floor(MAX_CHARS*0.8), tail = MAX_CHARS - head;
+  return t.slice(0,head) + "\n\n……[中间内容已截断]……\n\n" + t.slice(-tail);
+}
+
+/* ============ AI 层（多服务商） ============ */
+function pCfg(){
+  const p = settings.provider || "glm";
+  const saved = settings.providers[p] || {};
+  return { id:p, ...PROVIDERS[p], key:saved.key||"", model:saved.model || PROVIDERS[p].models[0] };
+}
+function extractJsonText(raw){
+  return raw.replace(/^```(?:json)?\s*/i,"").replace(/```\s*$/,"").trim();
+}
+async function callAIOnce(messages, json, viaProxy){
+  const cfg = pCfg();
+  if(!cfg.key) throw new Error(cfg.name + " 未配置 API Key，请点右上角「⚙ 设置」填写");
+  const base = viaProxy ? (PROXY_BASE + "/pass/" + cfg.base.replace("https://","")) : cfg.base;
+  let url, headers, body, parse;
+  if(cfg.style === "anthropic"){
+    url = base + "/messages";
+    headers = { "Content-Type":"application/json", "x-api-key":cfg.key,
+      "anthropic-version":"2023-06-01", "anthropic-dangerous-direct-browser-access":"true" };
+    body = { model:cfg.model, max_tokens:2000, temperature:0.2,
+      system: (messages.find(m=>m.role==="system")||{}).content || "",
+      messages: messages.filter(m=>m.role!=="system") };
+    parse = d => (d.content && d.content[0] && d.content[0].text) || "";
+  }else{
+    url = base + "/chat/completions";
+    headers = { "Content-Type":"application/json", "Authorization":"Bearer "+cfg.key };
+    body = { model:cfg.model, temperature:0.2, messages };
+    if(json && cfg.json) body.response_format = {type:"json_object"};
+    parse = d => (d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) || "";
+  }
+  const res = await fetch(url, {method:"POST", headers, body: JSON.stringify(body)});
+  if(!res.ok){
+    let detail = "";
+    try{ const j = await res.json(); detail = (j.error && j.error.message) || j.message || ""; }catch(e){}
+    if(res.status===401 || res.status===403) throw new Error(cfg.name + " API Key 无效或无权限（" + res.status + "）" + (detail?"："+detail:""));
+    if(res.status===429) throw new Error(cfg.name + " 请求过于频繁（429），请稍后重试" + (detail?"："+detail:""));
+    throw new Error(cfg.name + " 返回错误 " + res.status + (detail?"："+detail:""));
+  }
+  const data = await res.json();
+  return parse(data);
+}
+/* 直连失败(TypeError, 即 CORS/网络)的兜底：glm 切代理模式；其它服务商经代理转发重试一次 */
+async function callAI(messages, opts={}){
+  const json = opts.json !== false;
+  const pid = settings.provider || "glm";
+  try{
+    return await callAIOnce(messages, json, false);
+  }catch(err){
+    if(err instanceof TypeError){
+      if(pid === "glm"){
+        if(!settings.proxyMode){
+          settings.proxyMode = true; saveSettings(); updateProxyHint();
+          toast("浏览器直连失败（CORS），已切换本地代理模式，请确保已运行 node proxy.js", "warn", 6000);
+        }
+        try{ return await callAIOnce(messages, json, true); }
+        catch(e2){
+          throw new Error("浏览器直连被 CORS 拦截，且本地代理不可用。请先运行 node proxy.js 后重试");
+        }
+      }
+      try{ return await callAIOnce(messages, json, true); }
+      catch(e2){
+        throw new Error("浏览器直连被 CORS 拦截，且本地代理不可用。请先运行 node proxy.js 后重试");
+      }
+    }
+    throw err;
+  }
+}
+async function callAIWithRetry(messages, opts={}){
+  let lastErr;
+  for(let attempt=0; attempt<3; attempt++){
+    try{ return await callAI(messages, opts); }
+    catch(e){
+      lastErr = e;
+      if(/Key 无效/.test(e.message)) throw e;
+      if(attempt < 2) await sleep(2000 * Math.pow(2, attempt));
+    }
+  }
+  throw lastErr;
+}
+function normalizeJson(obj){
+  const fields = ["title","authors","year","keywords","research_question","methodology","data_and_sample","main_findings","innovation","limitations","one_sentence_summary"];
+  const out = {};
+  for(const f of fields){
+    let v = obj[f];
+    if(f==="authors" || f==="keywords"){
+      if(typeof v === "string") v = v.split(/[,，、;；]/).map(s=>s.trim()).filter(Boolean);
+      if(!Array.isArray(v)) v = [];
+      v = v.map(x=>String(x).trim()).filter(Boolean);
+      out[f] = v.length ? v : ["未提及"];
+    }else{
+      v = (v===undefined||v===null||v==="") ? "未提及" : String(v).trim();
+      out[f] = v || "未提及";
+    }
+  }
+  return out;
+}
+
+/* ============ 处理流程（顺序队列） ============ */
+function emptyFields(){
+  return { title:"—", authors:["未提及"], year:"—", keywords:["未提及"],
+    research_question:"—", methodology:"—", data_and_sample:"—",
+    main_findings:"—", innovation:"—", limitations:"—", one_sentence_summary:"—" };
+}
+async function handleFiles(fileList){
+  const pdfs = [...fileList].filter(f=>/\.pdf$/i.test(f.name));
+  if(pdfs.length === 0){ toast("仅支持 .pdf 文件", "err"); return; }
+  for(const f of pdfs){
+    const rec = { id:uid(), filename:f.name, status:"parsing", statusText:"", errMsg:"", text:"", ...emptyFields() };
+    records.unshift(rec); saveRecords(); render();
+    processRecord(rec, f);
+  }
+}
+async function processRecord(rec, file){
+  if(busy) await waitTurn();
+  busy = true;
+  try{
+    rec.status="parsing"; rec.errMsg="";
+    const { text, pages } = await extractPdfText(file, (i,n)=>{
+      rec.statusText = `第 ${i}/${n} 页`; renderRowById(rec.id);
+    });
+    if(text.replace(/\s/g,"").length < 30){
+      throw new Error("该 PDF 没有可提取的文本层（可能是扫描件），暂不支持扫描件");
+    }
+    rec.text = text; saveRecords();
+    rec.status="ai"; rec.statusText="AI 分析中…"; renderRowById(rec.id);
+    const raw = await callAIWithRetry([
+      {role:"system", content: SYSTEM_PROMPT},
+      {role:"user", content: truncateText(text) + JSON_SCHEMA_HINT}
+    ], {json:true});
+    Object.assign(rec, normalizeJson(JSON.parse(extractJsonText(raw))));
+    rec.status="done"; rec.statusText="完成"; rec.errMsg="";
+    toast(`「${rec.filename}」分析完成`, "ok");
+  }catch(err){
+    rec.status="fail"; rec.statusText="失败"; rec.errMsg=err.message || "未知错误";
+    toast(`「${rec.filename}」处理失败：${rec.errMsg}`, "err", 6000);
+  }finally{
+    busy = false;
+    saveRecords(); render();
+  }
+}
+
+/* ============ 翻译 ============ */
+async function translateRec(rec){
+  (async ()=>{
+    if(busy) await waitTurn(); busy = true;
+    try{
+      const src = JSON.stringify({ title: rec.title, one_sentence_summary: rec.one_sentence_summary, main_findings: rec.main_findings });
+      const raw = await callAIWithRetry([
+        {role:"system", content: TRANSLATE_PROMPT},
+        {role:"user", content: src}
+      ], {json:true});
+      const r = JSON.parse(extractJsonText(raw));
+      rec.title_zh = r.title_zh || "";
+      rec.summary_zh = r.summary_zh || "";
+      rec.findings_zh = r.findings_zh || "";
+      saveRecords(); render();
+      toast(`「${rec.filename}」翻译完成（标题/总结/结论已显示为中文）`, "ok");
+    }catch(err){
+      toast(`翻译失败：${err.message}`, "err", 6000);
+    }finally{ busy = false; }
+  })();
+}
+
+/* ============ 筛选 ============ */
+function statusLabel(r){
+  return {parsing:"解析中", ai:"AI 分析中", done:"完成", fail:"失败"}[r.status] || "解析中";
+}
+function filteredRecords(){
+  return records.filter(r=>{
+    if(filters.year!=="all" && String(r.year||"—")!==filters.year) return false;
+    if(filters.status!=="all" && statusLabel(r)!==filters.status) return false;
+    if(filters.kw!=="all" && !(Array.isArray(r.keywords) && r.keywords.includes(filters.kw))) return false;
+    if(filters.q){
+      const q = filters.q.toLowerCase();
+      const hay = [r.filename,r.title,r.title_zh,r.one_sentence_summary,r.summary_zh,r.research_question,
+        r.methodology,r.main_findings,r.innovation,r.limitations]
+        .concat(Array.isArray(r.authors)?r.authors:[r.authors])
+        .concat(Array.isArray(r.keywords)?r.keywords:[r.keywords])
+        .join(" ").toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+function refreshFilterOptions(){
+  const years = [...new Set(records.map(r=>String(r.year||"—")))].filter(Boolean).sort();
+  const kws = [...new Set(records.flatMap(r=>Array.isArray(r.keywords)?r.keywords:[r.keywords]).filter(k=>k&&k!=="未提及"))].sort();
+  const fill = (sel, list, prefix, cur) => {
+    const el = $(sel);
+    el.innerHTML = `<option value="all">${prefix}：全部</option>` + list.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join("");
+    el.value = list.includes(cur) ? cur : "all";
+  };
+  fill("#f-year", years, "年份", filters.year);
+  fill("#f-kw", kws, "关键词", filters.kw);
+  filters.year = $("#f-year").value; filters.kw = $("#f-kw").value;
+  $("#f-status").value = filters.status;
+}
+
+/* ============ 渲染 ============ */
+function statusBadge(rec){
+  const map = { parsing:["st-parsing", rec.statusText?`解析中（${rec.statusText}）`:"解析中"],
+    ai:["st-ai","AI 分析中…"], done:["st-done","完成"], fail:["st-fail","失败"] };
+  const [cls, label] = map[rec.status] || ["st-parsing","解析中"];
+  let html = `<span class="status ${cls}">${esc(label)}</span>`;
+  if(rec.status==="fail" && rec.errMsg) html += `<div class="err-msg">${esc(rec.errMsg)}</div>`;
+  return html;
+}
+function cellContent(rec, col){
+  const v0 = rec[col.key];
+  let v = v0;
+  if(col.key==="status") return statusBadge(rec);
+  let main;
+  if(col.type==="list"){
+    const arr = Array.isArray(v)?v:[v];
+    if(col.tag) main = arr.map(x=>`<span class="tag">${esc(x)}</span>`).join("") || `<span class="empty-tip">未提及</span>`;
+    else main = arr.map(esc).join("; ") || `<span class="empty-tip">未提及</span>`;
+  }else{
+    // 已翻译的字段直接显示中文；「取消翻译」可恢复英文原文
+    if(col.key==="title" && rec.title_zh) v = rec.title_zh;
+    if(col.key==="one_sentence_summary" && rec.summary_zh) v = rec.summary_zh;
+    if(col.key==="main_findings" && rec.findings_zh) v = rec.findings_zh;
+    main = esc(v) || `<span class="empty-tip">未提及</span>`;
+  }
+  return main;
+}
+function render(){
+  $("#thead-row").innerHTML = COLUMNS.map(c=>`<th>${esc(c.label)}</th>`).join("");
+  refreshFilterOptions();
+  const list = filteredRecords();
+  $("#f-count").textContent = `${list.length}/${records.length} 篇`;
+  const tbody = $("#tbody");
+  if(records.length===0){
+    tbody.innerHTML = `<tr><td colspan="${COLUMNS.length}" style="text-align:center;padding:34px;color:var(--muted);">暂无数据 —— 拖入一篇 PDF 开始体验</td></tr>`;
+    return;
+  }
+  if(list.length===0){
+    tbody.innerHTML = `<tr><td colspan="${COLUMNS.length}" style="text-align:center;padding:34px;color:var(--muted);">没有符合筛选条件的文献</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = list.map(rec=>`<tr data-id="${rec.id}" class="${rec.id===selectedId?"selected":""}">${
+    COLUMNS.map(col=>{
+      if(col.key==="ops"){
+        return `<td class="ops"><button class="btn small" data-act="reanalyze">重新分析</button><button class="btn small" data-act="translate">${rec.title_zh?"取消翻译":"翻译"}</button><button class="btn small danger" data-act="delete">删除</button></td>`;
+      }
+      const ed = col.editable===false ? "" : " editable";
+      return `<td class="${ed}" data-key="${col.key}">${cellContent(rec,col)}</td>`;
+    }).join("")
+  }</tr>`).join("");
+}
+function renderRowById(id){
+  const tr = $(`#tbody tr[data-id="${id}"]`);
+  if(!tr){ render(); return; }
+  const rec = records.find(r=>r.id===id); if(!rec) return;
+  const thIndex = COLUMNS.findIndex(c=>c.key==="status");
+  const td = tr.children[thIndex];
+  if(td && !tr.contains(document.activeElement)) td.innerHTML = statusBadge(rec);
+}
+
+/* ============ 单元格编辑 ============ */
+$("#tbody").addEventListener("dblclick", e=>{
+  const td = e.target.closest("td.editable");
+  if(!td || td.querySelector("textarea")) return;
+  const tr = td.closest("tr"); const rec = records.find(r=>r.id===tr.dataset.id);
+  const col = COLUMNS.find(c=>c.key===td.dataset.key); if(!rec || !col) return;
+  const cur = Array.isArray(rec[col.key]) ? rec[col.key].join(", ") : (rec[col.key]??"");
+  td.innerHTML = "";
+  const ta = document.createElement("textarea");
+  ta.className = "cell-editor"; ta.value = cur;
+  td.appendChild(ta); ta.focus(); ta.select();
+  let done = false;
+  const commit = ()=>{
+    if(done) return; done = true;
+    let val = ta.value.trim();
+    if(col.type==="list"){
+      const arr = val ? val.split(/[,，、;；]/).map(s=>s.trim()).filter(Boolean) : [];
+      rec[col.key] = arr.length ? arr : ["未提及"];
+    }else{
+      rec[col.key] = val || "未提及";
+    }
+    saveRecords(); render();
+  };
+  ta.addEventListener("blur", commit);
+  ta.addEventListener("keydown", ev=>{
+    if(ev.key==="Enter" && !ev.shiftKey){ ev.preventDefault(); ta.blur(); }
+    if(ev.key==="Escape"){ done=true; render(); }
+  });
+});
+
+/* ============ 行操作 + 行选择 ============ */
+$("#tbody").addEventListener("click", e=>{
+  const btn = e.target.closest("button[data-act]");
+  if(btn){
+    const tr = btn.closest("tr"); const id = tr.dataset.id;
+    const idx = records.findIndex(r=>r.id===id); if(idx<0) return;
+    const rec = records[idx];
+    if(btn.dataset.act==="delete"){
+      records.splice(idx,1); if(selectedId===id) selectedId=null;
+      saveRecords(); render(); toast("已删除", "ok", 1500);
+    }else if(btn.dataset.act==="reanalyze"){
+      if(!rec.text){ toast("该记录没有已提取的文本，请重新上传原 PDF 文件", "warn"); return; }
+      (async ()=>{
+        if(busy) await waitTurn(); busy = true;
+        try{
+          rec.status="ai"; rec.statusText="AI 分析中…"; rec.errMsg=""; renderRowById(id);
+          const raw = await callAIWithRetry([
+            {role:"system", content: SYSTEM_PROMPT},
+            {role:"user", content: truncateText(rec.text) + JSON_SCHEMA_HINT}
+          ], {json:true});
+          Object.assign(rec, normalizeJson(JSON.parse(extractJsonText(raw))));
+          rec.status="done"; rec.statusText="完成";
+          toast(`「${rec.filename}」重新分析完成`, "ok");
+        }catch(err){
+          rec.status="fail"; rec.statusText="失败"; rec.errMsg=err.message;
+          toast(`重新分析失败：${err.message}`, "err", 6000);
+        }finally{ busy=false; saveRecords(); render(); }
+      })();
+    }else if(btn.dataset.act==="translate"){
+      if(rec.title_zh || rec.summary_zh || rec.findings_zh){
+        delete rec.title_zh; delete rec.summary_zh; delete rec.findings_zh;
+        saveRecords(); render();
+        toast("已取消翻译，恢复英文原文", "ok", 1500);
+      }else{
+        translateRec(rec);
+      }
+    }
+    return;
+  }
+  // 点击行 -> 选中为对话上下文
+  const tr = e.target.closest("tr[data-id]");
+  if(tr) selectRow(tr.dataset.id);
+});
+function selectRow(id){
+  selectedId = id;
+  document.querySelectorAll("#tbody tr").forEach(tr=>tr.classList.toggle("selected", tr.dataset.id===id));
+  const tr = document.querySelector('#tbody tr.selected');
+  if(tr) tr.scrollIntoView({block:"center", behavior:"smooth"});
+  const rec = records.find(r=>r.id===id);
+  $("#chat-paper").textContent = rec ? `当前文献：${rec.title || rec.filename}` : "";
+  $("#chat-panel").classList.add("open");
+  renderChat();
+}
+
+/* ============ 对话侧边栏 ============ */
+/* 轻量 Markdown 渲染（先整体转义 HTML，再解析常见标记） */
+function inlineMd(s){
+  return s.replace(/\*\*([^*]+)\*\*/g,"<b>$1</b>")
+          .replace(/__([^_]+)__/g,"<b>$1</b>")
+          .replace(/(^|[^*\w])\*([^*\n]+)\*/g,"$1<i>$2</i>");
+}
+function mdRender(src){
+  let s = esc(src);
+  const blocks = [];
+  s = s.replace(/```([\s\S]*?)```/g, (_,c)=>{ blocks.push(c.replace(/^\w*\n/,"")); return "\u0000B"+(blocks.length-1)+"\u0000"; });
+  const codes = [];
+  s = s.replace(/`([^`\n]+)`/g, (_,c)=>{ codes.push(c); return "\u0000C"+(codes.length-1)+"\u0000"; });
+  const lines = s.split("\n");
+  let html = "", inUl=false, inOl=false;
+  const closeLists=()=>{ if(inUl){html+="</ul>";inUl=false;} if(inOl){html+="</ol>";inOl=false;} };
+  for(const ln of lines){
+    const bp = ln.match(/^\u0000B(\d+)\u0000$/);
+    if(bp){ closeLists(); html += `\u0000B${bp[1]}\u0000`; continue; }
+    const h = ln.match(/^(#{1,4})\s+(.*)/);
+    const ul = ln.match(/^\s*[-*•]\s+(.+)/);
+    const ol = ln.match(/^\s*(\d+)[.、)）]\s+(.+)/);
+    if(h){ closeLists(); html += `<h4>${inlineMd(h[2])}</h4>`; }
+    else if(ul){ if(inOl){html+="</ol>";inOl=false;} if(!inUl){html+="<ul>";inUl=true;} html+=`<li>${inlineMd(ul[1])}</li>`; }
+    else if(ol){ if(inUl){html+="</ul>";inUl=false;} if(!inOl){html+="<ol>";inOl=true;} html+=`<li>${inlineMd(ol[2])}</li>`; }
+    else if(ln.trim()===""){ closeLists(); }
+    else { closeLists(); html += `<p>${inlineMd(ln)}</p>`; }
+  }
+  closeLists();
+  return html.replace(/\u0000B(\d+)\u0000/g,(_,i)=>`<pre class="codeblock"><code>${blocks[+i]}</code></pre>`)
+             .replace(/\u0000C(\d+)\u0000/g,(_,i)=>`<code class="inlinecode">${codes[+i]}</code>`);
+}
+function msgHtml(m){
+  if(m.role==="user") return esc(m.content);
+  return '<div class="msg ai md">' + (m.content.startsWith("❌") ? esc(m.content) : mdRender(m.content)) + "</div>";
+}
+function renderChat(){
+  const box = $("#chat-msgs");
+  const hist = selectedId ? (chatHistories[selectedId]||[]) : [];
+  if(hist.length===0){
+    box.innerHTML = `<div class="chat-empty">点击表格任意一行选中文献<br>然后在这里基于该文献提问<br><br>例如：“这篇论文的创新点是什么？”<br>“研究方法有什么局限？”</div>`;
+    return;
+  }
+  box.innerHTML = hist.map(msgHtml).join("");
+  box.scrollTop = box.scrollHeight;
+}
+function toggleChat(open){
+  const p = $("#chat-panel");
+  const willOpen = open===undefined ? !p.classList.contains("open") : open;
+  p.classList.toggle("open", willOpen);
+  $("#btn-chat").textContent = willOpen ? "💬 收起对话" : "💬 问答";
+  $("#chat-close").textContent = willOpen ? "收起 ▶" : "展开 ◀";
+  if(willOpen) refreshChatModelBar();
+}
+$("#btn-chat").addEventListener("click", ()=> toggleChat());
+$("#chat-close").addEventListener("click", ()=> toggleChat(false));
+$("#chat-clear").addEventListener("click", ()=>{
+  if(selectedId){ chatHistories[selectedId]=[]; renderChat(); }
+});
+async function sendChat(){
+  if(chatBusy) return;
+  const rec = records.find(r=>r.id===selectedId);
+  if(!rec){ toast("请先点击表格中的一行文献，再提问", "warn"); return; }
+  const inp = $("#chat-in");
+  const text = inp.value.trim();
+  if(!text) return;
+  inp.value = "";
+  const hist = chatHistories[rec.id] = chatHistories[rec.id] || [];
+  hist.push({role:"user", content:text});
+  renderChat();
+  chatBusy = true;
+  const box = $("#chat-msgs");
+  const think = document.createElement("div");
+  think.className = "msg ai thinking"; think.textContent = "思考中…";
+  box.appendChild(think); box.scrollTop = box.scrollHeight;
+  try{
+    const context = rec.text
+      ? truncateText(rec.text)
+      : `（未提取到全文，仅有元数据）标题：${rec.title}；作者：${Array.isArray(rec.authors)?rec.authors.join(", "):rec.authors}；年份：${rec.year}`;
+    const messages = [
+      {role:"system", content: CHAT_PROMPT + context + "\n==================="},
+      ...hist.slice(-10).map(m=>({role:m.role, content:m.content}))
+    ];
+    const answer = await callAIWithRetry(messages, {json:false});
+    hist.push({role:"assistant", content:answer});
+  }catch(err){
+    hist.push({role:"assistant", content:"❌ 请求失败：" + err.message});
+  }finally{
+    chatBusy = false;
+    renderChat();
+  }
+}
+$("#chat-send").addEventListener("click", sendChat);
+$("#chat-in").addEventListener("keydown", e=>{
+  if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); sendChat(); }
+});
+
+/* ============ 对话栏模型切换 ============ */
+function fillChatModelOptions(){
+  const pid = settings.provider || "glm";
+  const saved = settings.providers[pid] || {};
+  const cur = saved.model || PROVIDERS[pid].models[0];
+  const inp = $("#chat-model");
+  inp.value = cur;
+  // datalist 仅作常用型号建议，不锁定 —— 模型名随时可手动输入
+  $("#chat-model-list").innerHTML = PROVIDERS[pid].models.map(m=>`<option value="${esc(m)}">`).join("");
+  inp.title = saved.key ? "模型名可直接手动输入，回车或点空白处保存" : "尚未配置该服务商的 API Key，可先输入模型名";
+}
+function refreshChatModelBar(){
+  $("#chat-provider").innerHTML = Object.entries(PROVIDERS)
+    .map(([id,p])=>`<option value="${id}" ${id===(settings.provider||"glm")?"selected":""}>${esc(p.name)}</option>`).join("");
+  fillChatModelOptions();
+}
+$("#chat-provider").addEventListener("change", e=>{
+  settings.provider = e.target.value;
+  saveSettings();
+  fillChatModelOptions();
+  const c = pCfg();
+  toast(c.key ? `已切换到 ${c.name} · ${c.model}` : `已切换到 ${c.name}，但尚未配置 API Key，请点「管理模型」`, c.key?"ok":"warn", 4000);
+});
+function commitChatModel(){
+  const pid = settings.provider || "glm";
+  const val = $("#chat-model").value.trim();
+  if(!val){ fillChatModelOptions(); return; }
+  if((settings.providers[pid]||{}).model === val) return;
+  settings.providers[pid] = settings.providers[pid] || {};
+  settings.providers[pid].model = val;
+  saveSettings();
+  toast("模型已保存：" + val, "ok", 2000);
+}
+$("#chat-model").addEventListener("change", commitChatModel);
+$("#chat-model").addEventListener("keydown", e=>{
+  if(e.key==="Enter"){ e.preventDefault(); e.target.blur(); }
+});
+$("#chat-manage").addEventListener("click", ()=> $("#btn-settings").click());
+
+/* ============ 筛选事件 ============ */
+$("#f-q").addEventListener("input", e=>{ filters.q = e.target.value.trim(); render(); });
+$("#f-year").addEventListener("change", e=>{ filters.year = e.target.value; render(); });
+$("#f-kw").addEventListener("change", e=>{ filters.kw = e.target.value; render(); });
+$("#f-status").addEventListener("change", e=>{ filters.status = e.target.value; render(); });
+$("#f-clear").addEventListener("click", ()=>{
+  filters = { q:"", year:"all", kw:"all", status:"all" };
+  $("#f-q").value = ""; render();
+});
+
+/* ============ CSV 导出 ============ */
+$("#btn-export").addEventListener("click", ()=>{
+  if(records.length===0){ toast("暂无数据可导出", "warn"); return; }
+  const cols = COLUMNS.filter(c=>!["status","ops"].includes(c.key));
+  const head = cols.map(c=>c.label);
+  const cell = v => {
+    let s = Array.isArray(v) ? v.join("; ") : String(v ?? "");
+    s = s.replace(/\r?\n/g," ");
+    return '"' + s.replace(/"/g,'""') + '"';
+  };
+  const lines = [head.map(cell).join(",")].concat(
+    records.map(r=>cols.map(c=>cell(r[c.key])).join(","))
+  );
+  const blob = new Blob(["\uFEFF" + lines.join("\r\n")], {type:"text/csv;charset=utf-8;"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "文献提炼表_" + new Date().toISOString().slice(0,10) + ".csv";
+  a.click(); URL.revokeObjectURL(a.href);
+  toast("CSV 已导出", "ok");
+});
+
+/* ============ 设置面板 ============ */
+function updateProxyHint(){ $("#proxy-line").classList.toggle("show", settings.proxyMode); }
+function fillProviderUI(){
+  const pid = $("#inp-provider").value;
+  const P = PROVIDERS[pid];
+  const saved = settings.providers[pid] || {};
+  $("#inp-key").value = saved.key || "";
+  $("#inp-model").value = saved.model || P.models[0];
+  $("#key-hint").textContent = "获取地址：" + P.hint;
+  $("#model-list").innerHTML = P.models.map(m=>`<option value="${esc(m)}">`).join("");
+}
+$("#btn-settings").addEventListener("click", ()=>{
+  $("#inp-provider").innerHTML = Object.entries(PROVIDERS).map(([id,p])=>`<option value="${id}" ${id===settings.provider?"selected":""}>${esc(p.name)}</option>`).join("");
+  fillProviderUI();
+  updateProxyHint();
+  $("#settings-mask").classList.add("show");
+});
+$("#inp-provider").addEventListener("change", fillProviderUI);
+$("#btn-cancel").addEventListener("click", ()=> $("#settings-mask").classList.remove("show"));
+$("#settings-mask").addEventListener("click", e=>{ if(e.target.id==="settings-mask") $("#settings-mask").classList.remove("show"); });
+$("#btn-save").addEventListener("click", ()=>{
+  const pid = $("#inp-provider").value;
+  settings.provider = pid;
+  settings.providers[pid] = {
+    key: $("#inp-key").value.trim(),
+    model: $("#inp-model").value.trim() || PROVIDERS[pid].models[0]
+  };
+  delete settings.apiKey; delete settings.model; // 清理旧版字段
+  saveSettings();
+  $("#settings-mask").classList.remove("show");
+  refreshChatModelBar();
+  toast("设置已保存（当前：" + PROVIDERS[pid].name + "）", "ok", 2500);
+});
+
+/* ============ 上传交互 ============ */
+const dz = $("#dropzone"), fi = $("#file-input");
+dz.addEventListener("click", ()=> fi.click());
+fi.addEventListener("change", ()=>{ handleFiles(fi.files); fi.value=""; });
+dz.addEventListener("dragover", e=>{ e.preventDefault(); dz.classList.add("dragover"); });
+dz.addEventListener("dragleave", ()=> dz.classList.remove("dragover"));
+dz.addEventListener("drop", e=>{
+  e.preventDefault(); dz.classList.remove("dragover");
+  handleFiles(e.dataTransfer.files);
+});
+
+/* ============ Zotero 联动 ============ */
+const BRIDGE = location.protocol.startsWith("http") ? "" : "http://127.0.0.1:3002";
+
+let zoteroTimer = null, lastZoteroKey = null, zoteroBridgeOk = null;
+function setZoteroBtn(state, label){
+  const b = $("#btn-zotero");
+  b.dataset.state = state;
+  b.textContent = label;
+}
+async function zoteroPoll(){
+  let data;
+  try{
+    const res = await fetch(BRIDGE + "/selected", {signal: AbortSignal.timeout(15000)});
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    data = await res.json();
+  }catch(e){
+    if(zoteroBridgeOk !== false){
+      zoteroBridgeOk = false;
+      setZoteroBtn("err", "🔌 Zotero 联动：未连接");
+      toast("Zotero 联动失败：请用 PaperLens.exe 启动（或先运行 python app.py），并确保 Zotero 已开启", "err", 7000);
+    }
+    return;
+  }
+  if(zoteroBridgeOk !== true){
+    zoteroBridgeOk = true;
+    setZoteroBtn("on", "🔌 Zotero 联动：监听中");
+    toast("Zotero 联动已就绪：在 Zotero 中选中文献即可自动分析", "ok");
+  }
+  if(data.error === "bbt_missing"){
+    lastZoteroKey = null;
+    if(!zoteroPoll._bbtWarned){
+      zoteroPoll._bbtWarned = true;
+      toast("Zotero 已连接，但 Better BibTeX 未就绪（未安装或启动失败，重启 Zotero 可恢复）", "warn", 7000);
+    }
+    return;
+  }
+  if(data.error === "local_api_disabled"){
+    lastZoteroKey = null;
+    if(!zoteroPoll._apiWarned){
+      zoteroPoll._apiWarned = true;
+      toast("Zotero 本地 API 未开启。请在 Zotero 菜单「工具 → 开发者 → Run JavaScript」中运行：Zotero.Prefs.set(\"httpServer.localAPI.enabled\", true)，然后重启 Zotero", "warn", 12000);
+    }
+    return;
+  }
+  if(data.error === "no_selection"){ lastZoteroKey = null; return; }
+  if(!data.key || data.key === lastZoteroKey) return;
+  lastZoteroKey = data.key;
+  if(data.error === "no_pdf"){ toast(`「${data.title || data.key}」没有找到 PDF 附件，跳过`, "warn"); return; }
+  const existing = records.find(r=>r.zoteroKey === data.key);
+  if(existing){
+    // 已在表格中：不重复添加，改为选中该行；同时用 Zotero 元数据回填旧版导入时缺失的字段
+    let filled = [];
+    const needTitle = !existing.title || existing.title==="—";
+    const needYear = !existing.year || existing.year==="—";
+    const needAuthors = !Array.isArray(existing.authors) || existing.authors.length===0 ||
+      (existing.authors.length===1 && existing.authors[0]==="未提及");
+    if(needTitle && data.title){ existing.title = data.title; filled.push("标题"); }
+    if(needAuthors && Array.isArray(data.authors) && data.authors.length){ existing.authors = data.authors; filled.push("作者"); }
+    if(needYear && data.year){ existing.year = data.year; filled.push("年份"); }
+    if(filled.length) saveRecords();
+    selectRow(existing.id);
+    toast(filled.length
+      ? `「${existing.title || existing.filename}」已在表格中，已补全${filled.join("/")}并选中该行`
+      : `「${existing.title || existing.filename}」已在表格中，已为你选中该行`, "ok", 4000);
+    return;
+  }
+  zoteroAutoAdd(data);
+}
+async function zoteroAutoAdd(d){
+  if(!pCfg().key){ toast("Zotero：检测到新文献，但未配置 API Key，请在「设置」中填写", "warn", 6000); return; }
+  if(!d.pdf_base64){ toast(`「${d.title || d.key}」没有 PDF 内容可分析`, "warn"); return; }
+  const bytes = Uint8Array.from(atob(d.pdf_base64), c=>c.charCodeAt(0));
+  const file = new File([bytes], d.filename || (d.key + ".pdf"), {type:"application/pdf"});
+  const rec = { id:uid(), filename:file.name, zoteroKey:d.key,
+    status:"parsing", statusText:"", errMsg:"", text:"",
+    title:d.title || "—",
+    authors:(Array.isArray(d.authors) && d.authors.length) ? d.authors : ["未提及"],
+    year:d.year || "—",
+    keywords:["未提及"], research_question:"—", methodology:"—", data_and_sample:"—",
+    main_findings:"—", innovation:"—", limitations:"—", one_sentence_summary:"—" };
+  records.unshift(rec); saveRecords(); render();
+  toast(`Zotero：开始分析「${rec.title}」`, "ok");
+  processRecord(rec, file);
+}
+function setZoteroLink(on){
+  settings.zotero = on; saveSettings();
+  if(on){
+    setZoteroBtn("on", "🔌 Zotero 联动：监听中");
+    zoteroPoll();
+    zoteroTimer = setInterval(zoteroPoll, 2500);
+  }else{
+    if(zoteroTimer){ clearInterval(zoteroTimer); zoteroTimer = null; }
+    zoteroBridgeOk = null; lastZoteroKey = null; zoteroPoll._bbtWarned = false; zoteroPoll._apiWarned = false;
+    setZoteroBtn("off", "🔌 Zotero 联动：关");
+  }
+}
+$("#btn-zotero").addEventListener("click", ()=> setZoteroLink(!settings.zotero));
+
+/* ============ 启动 ============ */
+window.addEventListener("error", e=>{
+  try{ toast("页面脚本出错：" + (e.message||"未知") + " —— 请截图发给开发者", "err", 8000); }catch(_){}
+});
+loadState();
+render();
+refreshChatModelBar();
+if(settings.proxyMode) toast("当前为本地代理模式，请确保 node proxy.js 正在运行", "warn", 5000);
+(async ()=>{
+  try{
+    const r = await fetch(BRIDGE + "/ping", {signal: AbortSignal.timeout(4000)});
+    const d = await r.json();
+    if(d.ok){
+      if(settings.zotero !== false){
+        setZoteroLink(true);
+        toast(d.bbt ? "Zotero 联动已自动开启：在 Zotero 中选中文献即可分析" : "桥接服务已连接，但 Better BibTeX 未就绪（建议重启 Zotero 后重试）", d.bbt ? "ok" : "warn", 6000);
+      }else{
+        toast("桥接服务已就绪，点击右上角「Zotero 联动」可开启", "warn", 5000);
+      }
+    }
+  }catch(e){ /* 直开且无服务：保持关闭 */ }
+})();
+</script>
+</body>
+</html>

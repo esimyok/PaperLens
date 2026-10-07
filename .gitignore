@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# PyInstaller 构建产物（exe 发布走 GitHub Releases）
+build/
+dist/
+
+# 打包出的可执行文件不入库
+PaperLens.exe
+
+# 本地运行残留
+wecom_sync_pending.jsonl
+build_log.txt
+run_test.txt
+
+# 个人本地工具目录
+.workbuddy/
+
+# Node（proxy.js 使用方）
+node_modules/
