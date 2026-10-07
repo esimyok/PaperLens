@@ -19,3 +19,4 @@ run_test.txt
 
 # Node（proxy.js 使用方）
 node_modules/
+"release_payload.json"  
