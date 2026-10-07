@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/logo-square.png" width="120" alt="PaperLens logo"></p>
+
 # PaperLens 🔍 · 文献智能提炼表格
 
 > 把文献 PDF 拖进浏览器，AI 自动提炼成一张结构化表格：研究问题、方法、数据样本、主要结论、创新点、局限性……一目了然。
