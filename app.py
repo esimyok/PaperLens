@@ -13,6 +13,7 @@ import base64
 import json
 import os
 import re
+import ssl
 import sys
 import threading
 import time
@@ -63,6 +64,51 @@ def local_api_get(path, timeout=15):
 class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, *args, **kwargs):
         return None
+
+
+def origin_ok(handler):
+    """只允许本机页面（含 file://）跨域访问本机服务；
+    其他网站的请求拒绝响应，防止任意网页读取 Zotero 数据。"""
+    o = handler.headers.get("Origin")
+    if o is None or o == "null":        # 同源请求 / file:// 打开页面
+        return True
+    try:
+        p = urllib.parse.urlparse(o)
+    except Exception:
+        return False
+    return p.hostname in ("127.0.0.1", "localhost")
+
+
+def http_get(url, timeout=90):
+    """GET 下载；打包环境常缺 CA 根证书，证书校验失败时降级重试一次
+    （仅用于按精确 id 从 arxiv.org 下载公开 PDF，内容只喂给前端 PDF.js 解析）"""
+    req = urllib.request.Request(url, headers={"User-Agent": "PaperLens/1.1"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return r.read()
+    except urllib.error.URLError as e:
+        if isinstance(getattr(e, "reason", None), ssl.SSLError) or \
+           "CERTIFICATE_VERIFY_FAILED" in str(getattr(e, "reason", "")):
+            ctx = ssl._create_unverified_context()
+            with urllib.request.urlopen(req, timeout=timeout, context=ctx) as r:
+                return r.read()
+        raise
+
+
+def fetch_arxiv(arxiv_id):
+    """按 arXiv id 下载 PDF（仅限 arxiv.org），返回 base64"""
+    arxiv_id = str(arxiv_id or "").strip().removesuffix(".pdf")
+    if not re.match(r"^[a-zA-Z0-9._/\-]+(v\d+)?$", arxiv_id) or ".." in arxiv_id:
+        return {"error": "bad_id", "detail": arxiv_id}
+    url = "https://arxiv.org/pdf/" + arxiv_id
+    try:
+        data = http_get(url)
+    except Exception as e:
+        return {"error": "fetch_fail", "detail": str(e)}
+    if data[:4] != b"%PDF":
+        return {"error": "not_pdf"}
+    return {"pdf_base64": base64.b64encode(data).decode("ascii"),
+            "filename": "arXiv-" + arxiv_id.replace("/", "_") + ".pdf"}
 
 
 def attachment_pdf(att_key):
@@ -206,17 +252,24 @@ def resource_path(name):
 
 
 class Handler(BaseHTTPRequestHandler):
+    def _cors(self):
+        o = self.headers.get("Origin")
+        if o:
+            self.send_header("Access-Control-Allow-Origin", o)
+
     def _send_json(self, obj, status=200):
         body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
+        self._cors()
         self.end_headers()
         self.wfile.write(body)
 
     def do_GET(self):
         path = urllib.parse.urlparse(self.path).path
+        if not origin_ok(self):
+            return self._send_json({"error": "forbidden"}, 403)
         try:
             if path in ("/", "/index.html"):
                 p = resource_path("index.html")
@@ -227,7 +280,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))
-                self.send_header("Access-Control-Allow-Origin", "*")
+                self._cors()
                 self.end_headers()
                 self.wfile.write(body)
             elif path == "/ping":
@@ -241,6 +294,9 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json({"ok": True, "zotero": alive, "bbt": bbt})
             elif path == "/selected":
                 self._send_json(get_selected())
+            elif path == "/fetch_arxiv":
+                qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+                self._send_json(fetch_arxiv(qs.get("id", [""])[0]))
             else:
                 self._send_json({"error": "not_found"}, 404)
         except Exception as e:

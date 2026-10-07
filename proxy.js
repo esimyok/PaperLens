@@ -12,11 +12,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// 智谱专用路径（旧版兼容）
-app.all("/api/paas/v4/*path", async (req, res) => {
-  await forward(res, "https://open.bigmodel.cn/api/paas/v4/" + req.params.path, req);
-});
-
 // 通用转发：/pass/<host>/<path...> -> https://<host>/<path...>
 // 支持 glm / deepseek / qwen / openai / gemini / claude 等所有服务商
 app.all("/pass/:host/*path", async (req, res) => {

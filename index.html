@@ -113,14 +113,77 @@
   .toast.ok{background:var(--ok);} .toast.err{background:var(--err);} .toast.warn{background:var(--warn);}
   @keyframes slidein{from{transform:translateX(30px);opacity:0;}to{transform:none;opacity:1;}}
   #global-progress{font-size:12.5px;color:var(--primary);margin-bottom:8px;min-height:18px;}
+
+  /* ==== v1.1 主题化 + 新增组件 ==== */
+  :root{
+    --th-bg:#f0f2f6; --row-line:#eef0f4; --cell-hover:#f6f8ff; --sel-bg:#eef3ff; --sel-hover:#e2ebff;
+    --soft-bg:#fafbfd; --soft-hover:#f7f9ff; --bubble-ai:#f0f2f6; --toast-bg:#2b3140;
+    --title-strong:#111827; --orig-text:#9ca3af; --bar-track:#edf0f5; --shadow:rgba(0,0,0,.18);
+  }
+  [data-theme="dark"]{
+    --bg:#12151c; --panel:#1b202b; --border:#2a3140; --text:#e5e9f2; --muted:#8b93a7;
+    --primary:#6d8bff; --primary-dark:#5877e8; --ok:#34d399; --warn:#fbbf24; --err:#f87171;
+    --chip-bg:#26304a; --chip-text:#9db4ff;
+    --th-bg:#202733; --row-line:#242b38; --cell-hover:#232b3a; --sel-bg:#24304d; --sel-hover:#2a3859;
+    --soft-bg:#202634; --soft-hover:#232b3b; --bubble-ai:#242b39; --toast-bg:#333b4d;
+    --title-strong:#f3f6ff; --orig-text:#7c8598; --bar-track:#242b38; --shadow:rgba(0,0,0,.5);
+  }
+  th{background:var(--th-bg);}
+  td{border-bottom:1px solid var(--row-line);}
+  td.editable:hover{background:var(--cell-hover);}
+  tr[data-id]:hover{background:var(--cell-hover);}
+  tr.selected{background:var(--sel-bg);}
+  tr.selected:hover{background:var(--sel-hover);}
+  tr.selected td.editable:hover{background:var(--sel-hover);}
+  #dropzone:hover,#dropzone.dragover{background:var(--soft-hover);}
+  .chat-head{background:var(--soft-bg);}
+  .chat-modelbar{background:var(--soft-bg);}
+  .msg.ai{background:var(--bubble-ai);}
+  .toast{background:var(--toast-bg);}
+  .modal{box-shadow:0 12px 40px var(--shadow);}
+  .modal .proxy-line{background:var(--cell-hover);}
+  td[data-key="title"]{font-weight:600;color:var(--title-strong);}
+  .zh{font-weight:500;}
+  .orig{display:block;color:var(--orig-text);font-size:11.5px;margin-top:2px;}
+
+  td{position:relative;}
+  .ccopy{position:absolute;top:4px;right:4px;border:1px solid var(--border);background:var(--panel);color:var(--muted);
+    border-radius:6px;font-size:11px;line-height:1;padding:3px 5px;cursor:pointer;opacity:0;transition:.15s;}
+  td:hover .ccopy{opacity:1;}
+  .ccopy:hover{color:var(--primary);border-color:var(--primary);}
+
+  .menu{position:fixed;z-index:300;background:var(--panel);border:1px solid var(--border);border-radius:10px;
+    box-shadow:0 8px 24px var(--shadow);padding:6px;min-width:190px;max-height:70vh;overflow:auto;}
+  .menu button{display:block;width:100%;text-align:left;border:0;background:none;padding:8px 10px;border-radius:7px;
+    font-size:13px;cursor:pointer;color:var(--text);white-space:nowrap;}
+  .menu button:hover{background:var(--cell-hover);}
+
+  #link-import{display:flex;gap:8px;margin-bottom:12px;}
+  #link-in{flex:1;border:1px solid var(--border);border-radius:10px;padding:9px 12px;font-size:13px;background:var(--panel);color:var(--text);}
+  #link-in:focus{outline:none;border-color:var(--primary);}
+
+  .bar-row{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:12.5px;}
+  .bar-label{width:170px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);flex:none;}
+  .bar-track{flex:1;height:14px;background:var(--bar-track);border-radius:7px;overflow:hidden;}
+  .bar{height:100%;background:var(--primary);border-radius:7px;min-width:2px;}
+  .bar-num{width:32px;color:var(--muted);flex:none;}
+  .stats-summary{font-size:13px;color:var(--muted);margin-bottom:12px;}
+  .stats-section{font-size:13px;font-weight:600;margin:12px 0 4px;color:var(--title-strong);}
+
+  .eg-steps{font-size:13px;line-height:2;}
+  .eg-note{font-size:11.5px;margin-top:6px;color:var(--muted);}
+  .ops{min-width:200px;}
+  body{transition:background .2s,color .2s;}
 </style>
 </head>
 <body>
 <header>
   <h1>PaperLens <span>· 文献智能提炼表格</span></h1>
   <button class="btn" id="btn-chat">💬 问答</button>
+  <button class="btn" id="btn-stats">📊 统计</button>
+  <button class="btn" id="btn-theme" title="切换深色 / 浅色">🌙 深色</button>
   <button class="btn" id="btn-zotero" data-state="off" title="开启后在 Zotero 中选中文献，本页自动抓取并分析">🔌 Zotero 联动：关</button>
-  <button class="btn" id="btn-export">导出 CSV</button>
+  <button class="btn" id="btn-export">导出 ▾</button>
   <button class="btn" id="btn-settings">⚙ 设置</button>
 </header>
 <main>
@@ -128,10 +191,15 @@
     <div class="icon">📄</div>
     <div class="dz-text">
       <div class="main-line">将 PDF 拖到此处，或点击选择文件（可多选）</div>
-      <div class="sub-line">仅支持 .pdf（需含文字层，暂不支持扫描件）· 点击表格行可在「问答」中针对该文献提问</div>
+      <div class="sub-line">仅支持 .pdf（扫描件会自动 OCR，较慢）· 点击表格行可在「问答」中针对该文献提问 · Ctrl+点击可选中多篇合并问答</div>
     </div>
   </div>
   <input type="file" id="file-input" accept=".pdf" multiple hidden>
+  <input type="file" id="backup-input" accept=".json" hidden>
+  <div id="link-import">
+    <input id="link-in" placeholder="或粘贴 arXiv 链接 / DOI（如 10.1038/xxx），回车导入：arXiv 自动下载 PDF 分析，DOI 先导入元数据">
+    <button class="btn" id="btn-link">导入</button>
+  </div>
   <div id="toolbar">
     <input id="f-q" placeholder="🔍 搜索：标题 / 作者 / 关键词 / 内容…">
     <select id="f-year"><option value="all">年份：全部</option></select>
@@ -144,6 +212,7 @@
       <option value="parsing">解析中</option>
     </select>
     <button class="btn small" id="f-clear">清除筛选</button>
+    <button class="btn small" id="btn-cols">列设置 ▾</button>
     <span id="f-count"></span>
   </div>
   <div id="global-progress"></div>
@@ -195,6 +264,17 @@
     <button class="btn primary" id="chat-send">发送</button>
   </div>
 </div>
+<div class="modal-mask" id="stats-mask">
+  <div class="modal" style="width:540px;">
+    <h2>📊 文献统计</h2>
+    <div id="stats-body"></div>
+    <div class="foot">
+      <button class="btn" id="btn-stats-close">关闭</button>
+    </div>
+  </div>
+</div>
+
+<div id="menu" class="menu" hidden></div>
 <div id="toast-box"></div>
 
 <script>
@@ -210,6 +290,7 @@ const SYSTEM_PROMPT = "你是学术论文分析助手。请从用户提供的文
 const JSON_SCHEMA_HINT = '\n\n请严格按以下 JSON Schema 输出（所有字段必须存在）：\n{"title":"","authors":[],"year":"","keywords":[],"research_question":"","methodology":"","data_and_sample":"","main_findings":"","innovation":"","limitations":"","one_sentence_summary":""}';
 const TRANSLATE_PROMPT = "你是学术文献翻译助手。用户会给你一个 JSON，请把其中 title、one_sentence_summary、main_findings 全部翻译成简体中文（专业术语准确、语句通顺）。严格只输出一个 JSON 对象：{\"title_zh\":\"...\",\"summary_zh\":\"...\",\"findings_zh\":\"...\"}，三个字段都必须存在，不要输出任何其他文字或 markdown 代码块。禁止编造。";
 const CHAT_PROMPT = "你是学术论文问答助手。请只依据下面提供的文献内容回答用户问题，用中文、简洁准确；文献中没有的信息要明确回答\"文献中未提及\"，禁止编造。\n\n===== 文献内容 =====\n";
+const CHAT_PROMPT_MULTI = "你是学术论文问答助手。用户提供了多篇文献的内容，请综合对比这些文献回答问题，用中文、简洁准确；可以指出文献之间的异同；文献中没有的信息要明确回答\"文献中未提及\"，禁止编造。\n\n===== 文献内容 =====\n";
 
 const PROVIDERS = {
   glm:     {name:"智谱 GLM",   base:"https://open.bigmodel.cn/api/paas/v4",                style:"openai",    json:true,  models:["glm-4-flash-250414","glm-4.7-flash","glm-4.6","glm-4-plus"], hint:"https://open.bigmodel.cn（glm-4-flash 系列免费）"},
@@ -239,10 +320,12 @@ const COLUMNS = [
 
 /* ============ 状态 ============ */
 let records = [];
-let settings = { provider:"glm", providers:{}, proxyMode:false, zotero:true };
+let settings = { provider:"glm", providers:{}, proxyMode:false, zotero:true,
+  hiddenCols:["data_and_sample","innovation","limitations"], theme:"light" };
 let busy = false;         // 顺序处理锁：同一时刻只发 1 个请求
-let selectedId = null;    // 当前对话选中的文献行
-let chatHistories = {};   // recordId -> [{role, content}]
+let selectedId = null;    // 当前对话的主选中行（兼容旧逻辑）
+let selectedIds = new Set(); // 问答上下文选中集（Ctrl+点击多选）
+let chatHistories = {};   // historyKey -> [{role, content}]
 let chatBusy = false;
 let filters = { q:"", year:"all", kw:"all", status:"all" };
 
@@ -263,8 +346,38 @@ function loadState(){
   }
   settings.provider = settings.provider || "glm";
   settings.providers = settings.providers || {};
+  settings.hiddenCols = Array.isArray(settings.hiddenCols) ? settings.hiddenCols : ["data_and_sample","innovation","limitations"];
+  // 旧版数据里全文存在 localStorage：迁移到 IndexedDB，避免撑爆 5MB 配额
+  (async ()=>{
+    for(const r of records){
+      if(typeof r.text === "string" && r.text){
+        textCache[r.id] = r.text;
+        try{ await idbSet(r.id, r.text); }catch(e){}
+        delete r.text;
+      }
+    }
+    saveRecords();
+  })();
+  // 中断恢复：上次页面关闭时未完成的分析标记为失败，允许重新分析
+  let interrupted = false;
+  for(const r of records){
+    if(r.status==="parsing" || r.status==="ai"){
+      r.status = "fail"; r.statusText = "已中断";
+      r.errMsg = "上次分析未完成（页面被关闭），可点「重新分析」继续";
+      interrupted = true;
+    }
+  }
+  if(interrupted) saveRecords();
 }
-function saveRecords(){ localStorage.setItem(LS_KEY, JSON.stringify(records)); }
+function saveRecords(){
+  // 全文存 IndexedDB（textCache），localStorage 只存表格字段，防配额溢出
+  const slim = records.map(r=>{ const {text, ...rest} = r; return rest; });
+  try{
+    localStorage.setItem(LS_KEY, JSON.stringify(slim));
+  }catch(e){
+    toast("浏览器存储空间不足，表格数据可能未保存！请点「导出 → 备份(JSON)」并清理少量记录", "err", 10000);
+  }
+}
 function saveSettings(){ localStorage.setItem(LS_SETTINGS, JSON.stringify(settings)); }
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
@@ -274,7 +387,67 @@ function waitTurn(){
   });
 }
 
-/* ============ PDF 解析 ============ */
+/* ============ IndexedDB：全文存储（localStorage 只存表格字段） ============ */
+const textCache = {};     // recordId -> 全文
+function idbOpen(){
+  return new Promise((res,rej)=>{
+    const q = indexedDB.open("paperlens", 1);
+    q.onupgradeneeded = ()=>{ if(!q.result.objectStoreNames.contains("texts")) q.result.createObjectStore("texts"); };
+    q.onsuccess = ()=>res(q.result);
+    q.onerror = ()=>rej(q.error);
+  });
+}
+async function idbSet(k,v){
+  const db = await idbOpen();
+  return new Promise((res,rej)=>{ const tx=db.transaction("texts","readwrite"); tx.objectStore("texts").put(v,k); tx.oncomplete=res; tx.onerror=()=>rej(tx.error); });
+}
+async function idbGet(k){
+  const db = await idbOpen();
+  return new Promise((res,rej)=>{ const rq=db.transaction("texts","readonly").objectStore("texts").get(k); rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(rq.error); });
+}
+async function idbDel(k){
+  const db = await idbOpen();
+  return new Promise((res,rej)=>{ const tx=db.transaction("texts","readwrite"); tx.objectStore("texts").delete(k); tx.oncomplete=res; tx.onerror=()=>rej(tx.error); });
+}
+async function idbClearAll(){
+  const db = await idbOpen();
+  return new Promise((res,rej)=>{ const tx=db.transaction("texts","readwrite"); tx.objectStore("texts").clear(); tx.oncomplete=res; tx.onerror=()=>rej(tx.error); });
+}
+function setText(rec, text){
+  rec.text = text; textCache[rec.id] = text;
+  idbSet(rec.id, text).catch(()=>{});
+}
+
+/* ============ 复制 / 下拉菜单 ============ */
+async function copyText(t, msg){
+  try{ await navigator.clipboard.writeText(t); }
+  catch(e){
+    const ta = document.createElement("textarea"); ta.value = t;
+    document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove();
+  }
+  toast(msg || "已复制", "ok", 2000);
+}
+const menuEl = () => $("#menu");
+function openMenu(anchor, items, stayOpen=false){
+  const m = menuEl();
+  m.innerHTML = "";
+  for(const it of items){
+    const b = document.createElement("button");
+    b.textContent = it.label;
+    b.addEventListener("click", ()=>{ if(!stayOpen) m.hidden = true; it.action(); });
+    m.appendChild(b);
+  }
+  m.hidden = false;
+  const r = anchor.getBoundingClientRect();
+  m.style.left = Math.max(8, Math.min(r.left, innerWidth - m.offsetWidth - 8)) + "px";
+  m.style.top = Math.min(r.bottom + 6, innerHeight - m.offsetHeight - 8) + "px";
+}
+document.addEventListener("click", e=>{
+  const m = menuEl();
+  if(!m.hidden && !m.contains(e.target)) m.hidden = true;
+}, true);
+
+/* ============ PDF 解析（含扫描件 OCR 兜底） ============ */
 async function extractPdfText(file, onProgress){
   const buf = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({data:buf}).promise;
@@ -287,12 +460,38 @@ async function extractPdfText(file, onProgress){
     text += tc.items.map(it=>it.str).join(" ") + "\n";
   }
   text = text.replace(/[ \t]+/g," ").replace(/\n{3,}/g,"\n\n").trim();
-  return { text, pages: total };
+  return { text, pages: total, pdf };
 }
-function truncateText(t){
-  if(t.length <= MAX_CHARS) return t;
-  const head = Math.floor(MAX_CHARS*0.8), tail = MAX_CHARS - head;
+function truncateText(t, cap=MAX_CHARS){
+  if(t.length <= cap) return t;
+  const head = Math.floor(cap*0.8), tail = cap - head;
   return t.slice(0,head) + "\n\n……[中间内容已截断]……\n\n" + t.slice(-tail);
+}
+/* 扫描件 OCR：tesseract.js 懒加载（首次使用才从 CDN 下载） */
+function loadTesseract(){
+  return new Promise((res,rej)=>{
+    if(window.Tesseract) return res();
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.1/tesseract.min.js";
+    s.onload = ()=>res();
+    s.onerror = ()=>rej(new Error("OCR 组件加载失败（需要联网）"));
+    document.head.appendChild(s);
+  });
+}
+async function ocrPdf(pdf, onProgress){
+  await loadTesseract();
+  let out = "";
+  for(let i=1;i<=pdf.numPages;i++){
+    onProgress(i, pdf.numPages);
+    const page = await pdf.getPage(i);
+    const vp = page.getViewport({scale:2});
+    const c = document.createElement("canvas");
+    c.width = vp.width; c.height = vp.height;
+    await page.render({canvasContext:c.getContext("2d"), viewport:vp}).promise;
+    const r = await Tesseract.recognize(c, "chi_sim+eng");
+    out += r.data.text + "\n";
+  }
+  return out.replace(/[ \t]+/g," ").replace(/\n{3,}/g,"\n\n").trim();
 }
 
 /* ============ AI 层（多服务商） ============ */
@@ -411,13 +610,27 @@ async function processRecord(rec, file){
   busy = true;
   try{
     rec.status="parsing"; rec.errMsg="";
-    const { text, pages } = await extractPdfText(file, (i,n)=>{
+    let { text, pages, pdf } = await extractPdfText(file, (i,n)=>{
       rec.statusText = `第 ${i}/${n} 页`; renderRowById(rec.id);
     });
     if(text.replace(/\s/g,"").length < 30){
-      throw new Error("该 PDF 没有可提取的文本层（可能是扫描件），暂不支持扫描件");
+      // 无文字层（扫描件）：OCR 兜底
+      toast(`「${rec.filename}」未检测到文字层，正在用 OCR 识别（扫描件较慢，请耐心等待）`, "warn", 8000);
+      rec.status="ai"; rec.statusText="OCR 识别中…"; renderRowById(rec.id);
+      let ocrText = "";
+      try{
+        ocrText = await ocrPdf(pdf, (i,n)=>{
+          rec.statusText = `OCR 第 ${i}/${n} 页`; renderRowById(rec.id);
+        });
+      }catch(ocrErr){
+        throw new Error(ocrErr.message || "该 PDF 没有可提取的文本层（可能是扫描件），且 OCR 失败");
+      }
+      if(ocrText.replace(/\s/g,"").length < 30){
+        throw new Error("OCR 后仍未提取到有效文本，该 PDF 可能是图片质量过低或空白页");
+      }
+      text = ocrText;
     }
-    rec.text = text; saveRecords();
+    setText(rec, text); saveRecords();
     rec.status="ai"; rec.statusText="AI 分析中…"; renderRowById(rec.id);
     const raw = await callAIWithRetry([
       {role:"system", content: SYSTEM_PROMPT},
@@ -502,44 +715,64 @@ function statusBadge(rec){
   return html;
 }
 function cellContent(rec, col){
-  const v0 = rec[col.key];
-  let v = v0;
   if(col.key==="status") return statusBadge(rec);
   let main;
   if(col.type==="list"){
-    const arr = Array.isArray(v)?v:[v];
+    const arr = Array.isArray(rec[col.key])?rec[col.key]:[rec[col.key]];
     if(col.tag) main = arr.map(x=>`<span class="tag">${esc(x)}</span>`).join("") || `<span class="empty-tip">未提及</span>`;
     else main = arr.map(esc).join("; ") || `<span class="empty-tip">未提及</span>`;
+  }else if(col.key==="title" && rec.title_zh){
+    // 翻译对照：中文为主，原文小字保留
+    main = `<span class="zh">${esc(rec.title_zh)}</span><span class="orig">原文：${esc(rec.title)}</span>`;
+  }else if(col.key==="one_sentence_summary" && rec.summary_zh){
+    main = `<span class="zh">${esc(rec.summary_zh)}</span><span class="orig">原文：${esc(rec.one_sentence_summary)}</span>`;
+  }else if(col.key==="main_findings" && rec.findings_zh){
+    main = `<span class="zh">${esc(rec.findings_zh)}</span><span class="orig">原文：${esc(rec.main_findings)}</span>`;
   }else{
-    // 已翻译的字段直接显示中文；「取消翻译」可恢复英文原文
-    if(col.key==="title" && rec.title_zh) v = rec.title_zh;
-    if(col.key==="one_sentence_summary" && rec.summary_zh) v = rec.summary_zh;
-    if(col.key==="main_findings" && rec.findings_zh) v = rec.findings_zh;
-    main = esc(v) || `<span class="empty-tip">未提及</span>`;
+    main = esc(rec[col.key]) || `<span class="empty-tip">未提及</span>`;
   }
   return main;
 }
+function cellRaw(rec, col){
+  // 单元格复制按钮使用的纯文本（翻译字段 = 中文 + 换行 + 原文）
+  if(col.type==="list"){
+    const arr = Array.isArray(rec[col.key])?rec[col.key]:[rec[col.key]];
+    return arr.filter(x=>x && x!=="未提及").join("; ");
+  }
+  if(col.key==="title" && rec.title_zh) return rec.title_zh + "\n" + rec.title;
+  if(col.key==="one_sentence_summary" && rec.summary_zh) return rec.summary_zh + "\n" + rec.one_sentence_summary;
+  if(col.key==="main_findings" && rec.findings_zh) return rec.findings_zh + "\n" + rec.main_findings;
+  return String(rec[col.key] ?? "");
+}
+function visibleCols(){
+  return COLUMNS.filter(c=>["filename","status","ops"].includes(c.key) || !settings.hiddenCols.includes(c.key));
+}
 function render(){
-  $("#thead-row").innerHTML = COLUMNS.map(c=>`<th>${esc(c.label)}</th>`).join("");
+  const cols = visibleCols();
+  $("#thead-row").innerHTML = cols.map(c=>`<th>${esc(c.label)}</th>`).join("");
   refreshFilterOptions();
   const list = filteredRecords();
   $("#f-count").textContent = `${list.length}/${records.length} 篇`;
   const tbody = $("#tbody");
   if(records.length===0){
-    tbody.innerHTML = `<tr><td colspan="${COLUMNS.length}" style="text-align:center;padding:34px;color:var(--muted);">暂无数据 —— 拖入一篇 PDF 开始体验</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${cols.length}" style="text-align:center;padding:28px;color:var(--muted);">
+      <div class="eg-steps">① 点「⚙ 设置」填入 AI Key &nbsp;→&nbsp; ② 拖入 PDF（或粘贴 arXiv 链接 / DOI） &nbsp;→&nbsp; ③ 自动生成文献表格</div>
+      <button class="btn small" id="btn-sample" style="margin-top:10px;">🎁 加载示例数据（3 篇真实经典论文）</button>
+      <div class="eg-note">示例数据可随时用行内「删除」移除</div></td></tr>`;
     return;
   }
   if(list.length===0){
-    tbody.innerHTML = `<tr><td colspan="${COLUMNS.length}" style="text-align:center;padding:34px;color:var(--muted);">没有符合筛选条件的文献</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${cols.length}" style="text-align:center;padding:34px;color:var(--muted);">没有符合筛选条件的文献</td></tr>`;
     return;
   }
-  tbody.innerHTML = list.map(rec=>`<tr data-id="${rec.id}" class="${rec.id===selectedId?"selected":""}">${
-    COLUMNS.map(col=>{
+  tbody.innerHTML = list.map(rec=>`<tr data-id="${rec.id}" class="${selectedIds.has(rec.id)?"selected":""}">${
+    cols.map(col=>{
       if(col.key==="ops"){
-        return `<td class="ops"><button class="btn small" data-act="reanalyze">重新分析</button><button class="btn small" data-act="translate">${rec.title_zh?"取消翻译":"翻译"}</button><button class="btn small danger" data-act="delete">删除</button></td>`;
+        return `<td class="ops"><button class="btn small" data-act="reanalyze">重新分析</button><button class="btn small" data-act="translate">${rec.title_zh?"取消翻译":"翻译"}</button><button class="btn small" data-act="cite">引用 ▾</button><button class="btn small danger" data-act="delete">删除</button></td>`;
       }
       const ed = col.editable===false ? "" : " editable";
-      return `<td class="${ed}" data-key="${col.key}">${cellContent(rec,col)}</td>`;
+      const cc = col.key==="status" ? "" : `<button class="ccopy" title="复制本格">⧉</button>`;
+      return `<td class="${ed}" data-key="${col.key}" data-raw="${esc(cellRaw(rec,col))}">${cellContent(rec,col)}${cc}</td>`;
     }).join("")
   }</tr>`).join("");
 }
@@ -582,7 +815,7 @@ $("#tbody").addEventListener("dblclick", e=>{
   });
 });
 
-/* ============ 行操作 + 行选择 ============ */
+/* ============ 行操作 + 行选择（Ctrl+点击多选） ============ */
 $("#tbody").addEventListener("click", e=>{
   const btn = e.target.closest("button[data-act]");
   if(btn){
@@ -590,7 +823,9 @@ $("#tbody").addEventListener("click", e=>{
     const idx = records.findIndex(r=>r.id===id); if(idx<0) return;
     const rec = records[idx];
     if(btn.dataset.act==="delete"){
-      records.splice(idx,1); if(selectedId===id) selectedId=null;
+      records.splice(idx,1); if(selectedIds.has(id)) selectedIds.delete(id);
+      if(selectedId===id) selectedId = selectedIds.values().next().value || null;
+      idbDel(id).catch(()=>{});
       saveRecords(); render(); toast("已删除", "ok", 1500);
     }else if(btn.dataset.act==="reanalyze"){
       if(!rec.text){ toast("该记录没有已提取的文本，请重新上传原 PDF 文件", "warn"); return; }
@@ -618,20 +853,47 @@ $("#tbody").addEventListener("click", e=>{
       }else{
         translateRec(rec);
       }
+    }else if(btn.dataset.act==="cite"){
+      e.stopPropagation();
+      openMenu(btn, [
+        { label:"GB/T 7714（国标）", action:()=> copyText(citeGBT(rec), "已复制 GB/T 7714 引用") },
+        { label:"APA", action:()=> copyText(citeAPA(rec), "已复制 APA 引用") },
+        { label:"本行（Markdown 表格）", action:()=> copyText(buildMarkdownTable([rec]), "已复制本行 Markdown") },
+      ]);
+      return;
     }
     return;
   }
-  // 点击行 -> 选中为对话上下文
+  if(e.target.closest("#btn-sample")){ loadSamples(); return; }
+  if(e.target.closest(".ccopy")){
+    const td = e.target.closest("td");
+    if(td && td.dataset.raw) copyText(td.dataset.raw, "已复制单元格内容");
+    return;
+  }
+  // 点击行 -> 选中为对话上下文；Ctrl/Cmd+点击 -> 加入/移出多选
   const tr = e.target.closest("tr[data-id]");
-  if(tr) selectRow(tr.dataset.id);
+  if(tr) rowClick(tr.dataset.id, e.ctrlKey || e.metaKey);
 });
-function selectRow(id){
+function selectedRecords(){
+  return [...selectedIds].map(x=>records.find(r=>r.id===x)).filter(Boolean);
+}
+function rowClick(id, additive){
+  if(additive){
+    if(selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id);
+    if(selectedIds.size===0) selectedIds.add(id);
+  }else{
+    selectedIds = new Set([id]);
+  }
   selectedId = id;
-  document.querySelectorAll("#tbody tr").forEach(tr=>tr.classList.toggle("selected", tr.dataset.id===id));
-  const tr = document.querySelector('#tbody tr.selected');
-  if(tr) tr.scrollIntoView({block:"center", behavior:"smooth"});
-  const rec = records.find(r=>r.id===id);
-  $("#chat-paper").textContent = rec ? `当前文献：${rec.title || rec.filename}` : "";
+  document.querySelectorAll("#tbody tr").forEach(tr=>tr.classList.toggle("selected", selectedIds.has(tr.dataset.id)));
+  const recs = selectedRecords();
+  $("#chat-paper").textContent = recs.length===1
+    ? `当前文献：${recs[0].title && recs[0].title!=="—" ? recs[0].title : recs[0].filename}`
+    : `已选 ${recs.length} 篇合并问答：${recs.slice(0,3).map(r=>r.title || r.filename).join(" / ")}${recs.length>3?" …":""}`;
+  if(!additive){
+    const tr = document.querySelector(`#tbody tr[data-id="${id}"]`);
+    if(tr) tr.scrollIntoView({block:"center", behavior:"smooth"});
+  }
   $("#chat-panel").classList.add("open");
   renderChat();
 }
@@ -676,7 +938,7 @@ function renderChat(){
   const box = $("#chat-msgs");
   const hist = selectedId ? (chatHistories[selectedId]||[]) : [];
   if(hist.length===0){
-    box.innerHTML = `<div class="chat-empty">点击表格任意一行选中文献<br>然后在这里基于该文献提问<br><br>例如：“这篇论文的创新点是什么？”<br>“研究方法有什么局限？”</div>`;
+    box.innerHTML = `<div class=”chat-empty”>点击表格任意一行选中文献（Ctrl+点击可多选合并问答）<br>然后在这里基于所选文献提问<br><br>例如：”这篇论文的创新点是什么？”<br>”这两篇文献的方法有什么异同？”</div>`;
     return;
   }
   box.innerHTML = hist.map(msgHtml).join("");
@@ -697,13 +959,15 @@ $("#chat-clear").addEventListener("click", ()=>{
 });
 async function sendChat(){
   if(chatBusy) return;
-  const rec = records.find(r=>r.id===selectedId);
-  if(!rec){ toast("请先点击表格中的一行文献，再提问", "warn"); return; }
+  const recs = selectedRecords();
+  if(!recs.length){ toast("请先点击表格中的一行文献（Ctrl+点击可多选），再提问", "warn"); return; }
   const inp = $("#chat-in");
   const text = inp.value.trim();
   if(!text) return;
   inp.value = "";
-  const hist = chatHistories[rec.id] = chatHistories[rec.id] || [];
+  // 会话历史按"选中集"隔离：单篇=记录 id；多篇=按 id 排序组合（换选即新会话）
+  const hkey = recs.length===1 ? recs[0].id : recs.map(r=>r.id).sort().join("|");
+  const hist = chatHistories[hkey] = chatHistories[hkey] || [];
   hist.push({role:"user", content:text});
   renderChat();
   chatBusy = true;
@@ -712,11 +976,25 @@ async function sendChat(){
   think.className = "msg ai thinking"; think.textContent = "思考中…";
   box.appendChild(think); box.scrollTop = box.scrollHeight;
   try{
-    const context = rec.text
-      ? truncateText(rec.text)
-      : `（未提取到全文，仅有元数据）标题：${rec.title}；作者：${Array.isArray(rec.authors)?rec.authors.join(", "):rec.authors}；年份：${rec.year}`;
+    let system;
+    if(recs.length===1){
+      const r = recs[0];
+      const context = r.text
+        ? truncateText(r.text)
+        : `（未提取到全文，仅有元数据）标题：${r.title}；作者：${Array.isArray(r.authors)?r.authors.join(", "):r.authors}；年份：${r.year}`;
+      system = CHAT_PROMPT + context + "\n===================";
+    }else{
+      // 多篇合并：每篇等额配额，总量不超过 MAX_CHARS
+      const per = Math.max(8000, Math.floor(MAX_CHARS / recs.length));
+      const context = recs.map((r,i)=>{
+        const body = r.text ? truncateText(r.text, per)
+          : `（未提取到全文，仅有元数据）标题：${r.title}；作者：${Array.isArray(r.authors)?r.authors.join(", "):r.authors}；年份：${r.year}`;
+        return `【文献 ${i+1}】${r.title && r.title!=="—" ? r.title : r.filename}${r.year && r.year!=="—" ? "（"+r.year+"）" : ""}\n${body}`;
+      }).join("\n\n");
+      system = CHAT_PROMPT_MULTI + context + "\n===================";
+    }
     const messages = [
-      {role:"system", content: CHAT_PROMPT + context + "\n==================="},
+      {role:"system", content: system},
       ...hist.slice(-10).map(m=>({role:m.role, content:m.content}))
     ];
     const answer = await callAIWithRetry(messages, {json:false});
@@ -782,25 +1060,149 @@ $("#f-clear").addEventListener("click", ()=>{
   $("#f-q").value = ""; render();
 });
 
-/* ============ CSV 导出 ============ */
-$("#btn-export").addEventListener("click", ()=>{
-  if(records.length===0){ toast("暂无数据可导出", "warn"); return; }
-  const cols = COLUMNS.filter(c=>!["status","ops"].includes(c.key));
-  const head = cols.map(c=>c.label);
-  const cell = v => {
-    let s = Array.isArray(v) ? v.join("; ") : String(v ?? "");
-    s = s.replace(/\r?\n/g," ");
-    return '"' + s.replace(/"/g,'""') + '"';
-  };
-  const lines = [head.map(cell).join(",")].concat(
-    records.map(r=>cols.map(c=>cell(r[c.key])).join(","))
+/* ============ 引用格式 / Markdown 导出 / 示例数据 ============ */
+function realAuthors(authors){
+  return (Array.isArray(authors)?authors:[]).filter(x=>x && x!=="未提及");
+}
+/* GB/T 7714：作者. 标题[J]. 年份.（无期刊元数据，类型标识用 [J] 简化，>3 位作者加"等"） */
+function citeGBT(r){
+  const a = realAuthors(r.authors);
+  const who = a.length ? (a.slice(0,3).join(", ") + (a.length>3 ? ", 等" : "")) : "佚名";
+  const t = r.title && r.title!=="—" ? r.title : r.filename;
+  const y = r.year && r.year!=="—" ? `${r.year}.` : "";
+  return `${who}. ${t}[J]. ${y}`.trim();
+}
+/* APA：Family, F. (Year). Title.（西文名转为"姓, 名首字母"；中文名保持原样） */
+function apaName(n){
+  n = String(n).trim();
+  if(!n.includes(" ")) return n;
+  const parts = n.split(/\s+/);
+  const family = parts.pop();
+  const given = parts.map(p=>p[0].toUpperCase()+".").join("");
+  return `${family}, ${given}`;
+}
+function citeAPA(r){
+  const a = realAuthors(r.authors).map(apaName);
+  let who;
+  if(!a.length) who = "佚名";
+  else if(a.length===1) who = a[0];
+  else if(a.length===2) who = a.join(" & ");
+  else who = a.join(", ");
+  const y = r.year && r.year!=="—" ? `(${r.year}).` : "(n.d.).";
+  const t = r.title && r.title!=="—" ? r.title : r.filename;
+  return `${who} ${y} ${t}.`;
+}
+function exportCols(){
+  return COLUMNS.filter(c=>!["status","ops"].includes(c.key) &&
+    (c.key==="filename" || !settings.hiddenCols.includes(c.key)));
+}
+function mdCell(v){
+  return String(Array.isArray(v)?v.join("; "):(v??"")).replace(/\|/g,"\\|").replace(/\r?\n/g," ");
+}
+function buildMarkdownTable(rows){
+  const cols = exportCols();
+  const lines = ["| " + cols.map(c=>c.label).join(" | ") + " |",
+                 "|" + cols.map(()=> "---").join("|") + "|"];
+  for(const r of rows) lines.push("| " + cols.map(c=>mdCell(r[c.key])).join(" | ") + " |");
+  return lines.join("\n");
+}
+function loadSamples(){
+  const mk = (o)=>({ id:uid(), status:"done", statusText:"完成", errMsg:"", text:"", ...emptyFields(), ...o });
+  records.unshift(
+    mk({ filename:"示例-Attention Is All You Need.pdf", title:"Attention Is All You Need",
+      authors:["Ashish Vaswani","Noam Shazeer","Niki Parmar"], year:"2017",
+      keywords:["Transformer","注意力机制","机器翻译","NLP"],
+      research_question:"能否完全基于注意力机制构建序列转换模型，摆脱循环与卷积结构？",
+      methodology:"提出 Transformer 架构：仅用自注意力与前馈层，配合多头注意力与位置编码，可完全并行训练。",
+      data_and_sample:"WMT 2014 英德 / 英法翻译数据集（约 450 万 / 3600 万句对）。",
+      main_findings:"WMT 2014 英德任务取得 28.4 BLEU，刷新当时最优；训练成本显著低于此前模型。",
+      innovation:"首个纯注意力序列转换架构，抛弃循环与卷积，训练可高度并行。",
+      limitations:"自注意力对序列长度呈二次复杂度，处理超长文本开销大。",
+      one_sentence_summary:"提出纯注意力架构 Transformer，以更低训练成本刷新机器翻译最优成绩。" }),
+    mk({ filename:"示例-Deep Residual Learning.pdf", title:"Deep Residual Learning for Image Recognition",
+      authors:["Kaiming He","Xiangyu Zhang","Shaoqing Ren","Jian Sun"], year:"2016",
+      keywords:["ResNet","残差学习","图像识别","深度学习"],
+      research_question:"网络加深后出现退化问题，残差学习能否让深层网络稳定训练？",
+      methodology:"引入恒等捷径连接（shortcut），让堆叠层学习残差映射 F(x)+x，便于优化。",
+      data_and_sample:"ImageNet 2014 分类数据集；CIFAR-10。",
+      main_findings:"152 层 ResNet 取得 ImageNet top-5 错误率 3.57%，获 ILSVRC 2015 分类冠军。",
+      innovation:"残差连接突破深度瓶颈，使上百层网络可稳定训练。",
+      limitations:"极深网络存在层冗余，推理计算成本仍较高。",
+      one_sentence_summary:"用残差连接解决深层网络退化问题，把可用网络深度推至上百层。" }),
+    mk({ filename:"示例-BERT.pdf", title:"BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+      authors:["Jacob Devlin","Ming-Wei Chang","Kenton Lee","Kristina Toutanova"], year:"2019",
+      keywords:["BERT","预训练","双向编码","NLP"],
+      research_question:"深度双向预训练表征能否广泛迁移并提升各类下游 NLP 任务？",
+      methodology:"用掩码语言模型（MLM）与下一句预测（NSP）预训练 Transformer 编码器，再对下游任务统一微调。",
+      data_and_sample:"BooksCorpus 与英文维基百科（共约 33 亿词）。",
+      main_findings:"11 项 NLP 任务刷新最优，GLUE 基准平均提升 7.7 个百分点。",
+      innovation:"确立\"深度双向预训练 + 统一微调\"范式，无需为单任务定制结构。",
+      limitations:"预训练成本高；NSP 任务的有效性后来受到质疑。",
+      one_sentence_summary:"证明深度双向预训练表征可一次性迁移至 11 项 NLP 任务并全面刷新纪录。" })
   );
-  const blob = new Blob(["\uFEFF" + lines.join("\r\n")], {type:"text/csv;charset=utf-8;"});
+  saveRecords(); render();
+  toast("已加载 3 篇示例文献（真实经典论文，可随时删除）", "ok");
+}
+/* ============ 导出 / 备份 ============ */
+function downloadFile(content, filename, mime){
+  const blob = new Blob([content], {type:mime});
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = "文献提炼表_" + new Date().toISOString().slice(0,10) + ".csv";
+  a.download = filename;
   a.click(); URL.revokeObjectURL(a.href);
-  toast("CSV 已导出", "ok");
+}
+$("#btn-export").addEventListener("click", e=>{
+  e.stopPropagation();
+  if(records.length===0){ toast("暂无数据可导出", "warn"); return; }
+  openMenu(e.currentTarget, [
+    { label:"📄 导出 CSV（Excel 直开）", action:()=>{
+      const cols = exportCols();
+      const cell = v => {
+        let s = Array.isArray(v) ? v.join("; ") : String(v ?? "");
+        s = s.replace(/\r?\n/g," ");
+        return '"' + s.replace(/"/g,'""') + '"';
+      };
+      const lines = [cols.map(c=>c.label).map(cell).join(",")].concat(
+        records.map(r=>cols.map(c=>cell(r[c.key])).join(","))
+      );
+      downloadFile("\uFEFF" + lines.join("\r\n"),
+        "文献提炼表_" + new Date().toISOString().slice(0,10) + ".csv", "text/csv;charset=utf-8;");
+      toast("CSV 已导出", "ok");
+    }},
+    { label:"📝 导出 Markdown 表格", action:()=>{
+      downloadFile(buildMarkdownTable(records),
+        "文献提炼表_" + new Date().toISOString().slice(0,10) + ".md", "text/markdown;charset=utf-8;");
+      toast("Markdown 已导出", "ok");
+    }},
+    { label:"💾 导出备份（JSON，含全文）", action:()=>{
+      const data = { app:"PaperLens", version:2, exported_at:new Date().toISOString(),
+        records: records.map(r=>{ const {text, ...rest} = r; return rest; }), texts: textCache };
+      downloadFile(JSON.stringify(data, null, 1),
+        "paperlens_backup_" + new Date().toISOString().slice(0,10) + ".json", "application/json");
+      toast("备份已导出（表格 + 全文）", "ok");
+    }},
+    { label:"📥 导入备份（JSON）", action:()=> $("#backup-input").click() },
+  ]);
+});
+$("#backup-input").addEventListener("change", async ()=>{
+  const f = $("#backup-input").files[0]; $("#backup-input").value = "";
+  if(!f) return;
+  if(busy){ toast("正在分析中，请等当前任务完成后再导入", "warn", 5000); return; }
+  try{
+    const data = JSON.parse(await f.text());
+    if(data.app !== "PaperLens" || !Array.isArray(data.records)) throw new Error("不是有效的 PaperLens 备份文件");
+    if(!confirm(`导入将覆盖当前 ${records.length} 条记录，替换为备份中的 ${data.records.length} 条，继续？`)) return;
+    records = data.records;
+    for(const k of Object.keys(textCache)) delete textCache[k];
+    Object.assign(textCache, data.texts || {});
+    for(const r of records) r.text = textCache[r.id] || "";
+    await idbClearAll();
+    for(const [k,v] of Object.entries(textCache)) await idbSet(k, v);
+    saveRecords(); render();
+    toast(`已导入 ${records.length} 条记录`, "ok");
+  }catch(err){
+    toast("导入失败：" + err.message, "err", 6000);
+  }
 });
 
 /* ============ 设置面板 ============ */
@@ -908,7 +1310,7 @@ async function zoteroPoll(){
     if(needAuthors && Array.isArray(data.authors) && data.authors.length){ existing.authors = data.authors; filled.push("作者"); }
     if(needYear && data.year){ existing.year = data.year; filled.push("年份"); }
     if(filled.length) saveRecords();
-    selectRow(existing.id);
+    rowClick(existing.id, false);
     toast(filled.length
       ? `「${existing.title || existing.filename}」已在表格中，已补全${filled.join("/")}并选中该行`
       : `「${existing.title || existing.filename}」已在表格中，已为你选中该行`, "ok", 4000);
@@ -946,12 +1348,157 @@ function setZoteroLink(on){
 }
 $("#btn-zotero").addEventListener("click", ()=> setZoteroLink(!settings.zotero));
 
+/* ============ 深色模式 ============ */
+function applyTheme(){
+  document.documentElement.dataset.theme = settings.theme === "dark" ? "dark" : "";
+  $("#btn-theme").textContent = settings.theme === "dark" ? "☀️ 浅色" : "🌙 深色";
+}
+$("#btn-theme").addEventListener("click", ()=>{
+  settings.theme = settings.theme === "dark" ? "light" : "dark";
+  saveSettings(); applyTheme();
+});
+
+/* ============ 统计面板 ============ */
+function barList(pairs){
+  const max = Math.max(1, ...pairs.map(p=>p[1]));
+  return pairs.map(([k,n])=>`<div class="bar-row"><span class="bar-label" title="${esc(k)}">${esc(k)}</span><div class="bar-track"><div class="bar" style="width:${Math.round(n/max*100)}%"></div></div><span class="bar-num">${n}</span></div>`).join("");
+}
+$("#btn-stats").addEventListener("click", ()=>{
+  if(records.length===0){ toast("暂无数据，先导入几篇文献再看统计", "warn"); return; }
+  const done = records.filter(r=>r.status==="done").length;
+  const fail = records.filter(r=>r.status==="fail").length;
+  const translated = records.filter(r=>r.title_zh || r.summary_zh).length;
+  const summary = `<div class="stats-summary">共 ${records.length} 篇 · 完成 ${done} · 失败 ${fail} · 已翻译 ${translated}</div>`;
+  const yearCount = {};
+  for(const r of records){
+    const y = (r.year && r.year!=="—" && r.year!=="未提及") ? String(r.year) : "未知";
+    yearCount[y] = (yearCount[y]||0) + 1;
+  }
+  const yearPairs = Object.entries(yearCount).sort((a,b)=>{
+    const na = /^\d{4}$/.test(a[0]) ? +a[0] : Infinity;
+    const nb = /^\d{4}$/.test(b[0]) ? +b[0] : Infinity;
+    return na - nb;
+  });
+  const kwCount = {};
+  for(const r of records){
+    const arr = Array.isArray(r.keywords)?r.keywords:[];
+    for(const k of arr){ if(k && k!=="未提及") kwCount[k] = (kwCount[k]||0) + 1; }
+  }
+  const kwPairs = Object.entries(kwCount).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  $("#stats-body").innerHTML = summary
+    + `<div class="stats-section">年份分布</div>${barList(yearPairs)}`
+    + `<div class="stats-section">高频关键词（前 ${kwPairs.length}）</div>${barList(kwPairs)}`;
+  $("#stats-mask").classList.add("show");
+});
+$("#btn-stats-close").addEventListener("click", ()=> $("#stats-mask").classList.remove("show"));
+$("#stats-mask").addEventListener("click", e=>{ if(e.target.id==="stats-mask") $("#stats-mask").classList.remove("show"); });
+
+/* ============ 列显示设置 ============ */
+function showColsMenu(anchor){
+  const items = COLUMNS
+    .filter(c=>!["filename","status","ops"].includes(c.key))
+    .map(c=>({
+      label: (settings.hiddenCols.includes(c.key) ? "☐ " : "☑ ") + c.label,
+      action: ()=>{
+        const i = settings.hiddenCols.indexOf(c.key);
+        if(i<0) settings.hiddenCols.push(c.key); else settings.hiddenCols.splice(i,1);
+        saveSettings(); render();
+        showColsMenu(anchor);   // 保持菜单打开并刷新勾选状态
+      }
+    }));
+  openMenu(anchor, items, true);
+}
+$("#btn-cols").addEventListener("click", e=>{ e.stopPropagation(); showColsMenu(e.currentTarget); });
+
+/* ============ arXiv / DOI 导入 ============ */
+function parseLink(raw){
+  const s = raw.trim();
+  let m = s.match(/arxiv\.org\/(?:abs|pdf)\/([^\s?#]+)/i) || s.match(/^arxiv[:：]\s*([^\s]+)/i);
+  if(m) return { type:"arxiv", id: m[1].replace(/\.pdf$/i,"") };
+  m = s.match(/^(10\.\d{4,9}\/\S+)$/);
+  if(m) return { type:"doi", id: m[1].replace(/[.,;]$/,"") };
+  return null;
+}
+function bufToB64(buf){
+  const bytes = new Uint8Array(buf);
+  let bin = "";
+  const CH = 0x8000;   // 分块转换，避免大文件超栈
+  for(let i=0;i<bytes.length;i+=CH){
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i+CH));
+  }
+  return btoa(bin);
+}
+async function importLink(){
+  const raw = $("#link-in").value;
+  const target = parseLink(raw);
+  if(!target){ toast("无法识别：请粘贴 arXiv 链接（arxiv.org/abs/…）或 DOI（10.xxxx/…）", "warn", 5000); return; }
+  if(target.type==="arxiv"){
+    toast(`正在从 arXiv 下载 ${target.id} 的 PDF…`, "ok", 4000);
+    try{
+      let d;
+      if(BRIDGE){
+        const r = await fetch(BRIDGE + "/fetch_arxiv?id=" + encodeURIComponent(target.id), {signal: AbortSignal.timeout(120000)});
+        d = await r.json();
+      }else{
+        // 无本地服务：直接从 arXiv 拉取（arXiv 支持 CORS 时可用）
+        const r = await fetch("https://arxiv.org/pdf/" + encodeURIComponent(target.id));
+        if(!r.ok) throw new Error("HTTP " + r.status);
+        d = { pdf_base64: bufToB64(await r.arrayBuffer()),
+             filename: "arXiv-" + target.id.replace("/","_") + ".pdf" };
+      }
+      if(d.error) throw new Error(d.detail || d.error);
+      const bytes = Uint8Array.from(atob(d.pdf_base64), c=>c.charCodeAt(0));
+      const file = new File([bytes], d.filename, {type:"application/pdf"});
+      $("#link-in").value = "";
+      handleFiles([file]);
+    }catch(err){
+      toast("arXiv 下载失败：" + err.message + (BRIDGE ? "" : "（建议用 PaperLens.exe 启动后重试）"), "err", 7000);
+    }
+  }else{
+    // DOI：走 Crossref 公开 API 导入元数据（浏览器直连，支持 CORS）
+    toast(`正在从 Crossref 获取 DOI 元数据…`, "ok", 3000);
+    try{
+      const r = await fetch("https://api.crossref.org/works/" + encodeURIComponent(target.id), {signal: AbortSignal.timeout(20000)});
+      if(!r.ok) throw new Error("HTTP " + r.status);
+      const msg = (await r.json()).message;
+      const yparts = (((msg.issued || {})["date-parts"] || [[]])[0]) || [];
+      const authors = (msg.author || []).map(a=>[a.family, a.given].filter(Boolean).join(" ")).filter(Boolean);
+      const rec = { id:uid(), filename:(target.id + ".doi"), zoteroKey:null,
+        status:"fail", statusText:"缺 PDF", errMsg:"元数据已从 Crossref 导入；未找到公开 PDF，请上传该文献的 PDF 文件后点「重新分析」",
+        title: (msg.title && msg.title[0]) || "—",
+        authors: authors.length ? authors : ["未提及"],
+        year: String(yparts[0] || "—"),
+        keywords:["未提及"], research_question:"—", methodology:"—", data_and_sample:"—",
+        main_findings:"—", innovation:"—", limitations:"—", one_sentence_summary:"—",
+        text:"" };
+      records.unshift(rec); saveRecords(); render();
+      $("#link-in").value = "";
+      toast(`已导入 DOI 元数据：「${rec.title}」`, "ok");
+    }catch(err){
+      toast("DOI 导入失败：" + err.message, "err", 6000);
+    }
+  }
+}
+$("#btn-link").addEventListener("click", importLink);
+$("#link-in").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); importLink(); } });
+
 /* ============ 启动 ============ */
 window.addEventListener("error", e=>{
-  try{ toast("页面脚本出错：" + (e.message||"未知") + " —— 请截图发给开发者", "err", 8000); }catch(_){}
+  try{ toast("页面脚本出错：" + (e.message||"未知") + " —— 请到 github.com/esimyok/PaperLens/issues 反馈", "err", 8000); }catch(_){}
 });
 loadState();
+(async ()=>{  // 从 IndexedDB 回填全文到内存，供问答/重新分析使用
+  try{
+    const db = await idbOpen();
+    const store = db.transaction("texts","readonly").objectStore("texts");
+    const keys = await new Promise((res,rej)=>{ const rq=store.getAllKeys(); rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(rq.error); });
+    for(const k of keys){ textCache[k] = await idbGet(k); }
+    for(const r of records){ r.text = textCache[r.id] || ""; }
+  }catch(e){}
+  render();
+})();
 render();
+applyTheme();
 refreshChatModelBar();
 if(settings.proxyMode) toast("当前为本地代理模式，请确保 node proxy.js 正在运行", "warn", 5000);
 (async ()=>{
