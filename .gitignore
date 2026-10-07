@@ -21,3 +21,4 @@ run_test.txt
 node_modules/
 "release_payload.json"  
 "release_resp.json"  
+"_rels.json"  
