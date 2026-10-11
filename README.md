@@ -1,123 +1,165 @@
-<p align="center"><img src="docs/logo-square.png" width="120" alt="SiftLit logo"></p>
+# SiftLit · Web 工程版（npm 分支）
 
-# SiftLit 🔍 · 文献智能提炼表格
+> **本仓库是 SiftLit 主项目的额外版本（Web 工程版）。**
+> 主版本把整个应用实现在单个 `index.html` 里，配一个 Python `app.py` 做本地中转服务，并可用 PyInstaller 打包成 `.exe`；
+> 本分支把前端重构为标准 Vite 工程，并把本地能力（Zotero 联动、AI 同源转发）**整合为一个 Node 单进程服务**，
+> 定位是「可构建、可维护、纯 Node、无 Python 依赖」的 Web 版本，**不做 `.exe` 打包**。
 
-> 把文献 PDF 拖进浏览器，AI 自动提炼成一张结构化表格：研究问题、方法、数据样本、主要结论、创新点、局限性……一目了然。
 
-![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue) ![license](https://img.shields.io/badge/license-MIT-green) ![deps](https://img.shields.io/badge/服务端依赖-零-orange)
+![主界面](docs/screenshot-main.png)
 
-![SiftLit 界面截图](docs/screenshot-main.png)
+---
 
-深色模式：
+## 1. 它做什么
 
-![SiftLit 深色模式](docs/screenshot-dark.png)
+拖入 PDF → 自动解析文本（扫描件走 OCR）→ 调用大模型按固定 Schema 提炼 **11 个结构化字段** → 生成可筛选、可编辑、可导出的文献表格；支持文献问答、中英翻译、Zotero 联动与 arXiv / DOI 导入。
 
-多 AI 服务商配置——每家的 Key 和模型分别保存，随时切换：
+所有数据只留在本机：**AI Key 仅存浏览器，表格与 PDF 全文存本地存储，无任何遥测。**
 
-![SiftLit 设置截图](docs/screenshot-settings.png)
+## 2. 与主版本的区别
 
-## 这是什么
+| 维度               | 主版本（原单文件版）                 | 本分支（Web 工程版）                                                  |
+| ------------------ | ------------------------------------ | --------------------------------------------------------------------- |
+| 前端形态           | 单个 `index.html`（约 1870 行）      | Vite 工程（`src/` 按 contract/core/storage/bridge/ai/domain/ui 分层） |
+| 本地中转服务       | Python `app.py`（独立进程，:`3002`） | Node `server/`（**与页面同进程同源**，默认 `:4173`）                  |
+| 运行时依赖         | Node + Python                        | **仅 Node**                                                           |
+| CORS 保障连接      | `proxy.js`（已弃用）→ `app.py /ai`   | 同源 `/ai` 转发，无跨域                                               |
+| pdf.js / tesseract | CDN 引入                             | npm 依赖 + **资源本地化**（离线 OCR）                                 |
+| 打包               | PyInstaller `.exe`                   | 静态站点 + Node 服务（**不做 exe**）                                  |
+| 构建               | 无                                   | `npm run build`                                                       |
 
-读文献时经常需要把几十篇论文整理成文献综述表格（研究问题 / 方法 / 结论……），逐篇手摘非常耗时。SiftLit 把这件事压缩成两步：**拖入 PDF → AI 提炼**，并在本地浏览器里生成可编辑、可筛选、可导出的表格。
+功能行为与主版本对齐（同一套 UI 与交互）；差异只在工程结构与运行时。
 
-- **纯本地运行**：只有一个本地静态服务，分析结果存在浏览器 localStorage，不上传任何服务器；
-- **自带 API Key**：直接在浏览器里调用你自己的大模型 API Key（支持 6 家服务商），密钥只存在本机；
-- **Zotero 联动**：在 Zotero 中选中文献，这边自动开始分析，无缝接入既有文献管理流程。
+## 3. 功能特性
 
-## ✨ 功能特性
+- **PDF 解析**：pdf.js v4 提取文字层；**当遇到特殊 PDF（扫描件 / 图片型 PDF，即没有可选中文字层）时，自动用 tesseract.js OCR 兜底**（语言包本地化，可离线）。
+- **AI 提炼**：6 家服务商（智谱 GLM / DeepSeek / 通义千问 / OpenAI / Gemini / Claude），11 字段固定输出。
+- **表格**：搜索、按年份/关键词/状态筛选、明细展开、**双击单元格就地编辑**、列设置、统计面板。
+- **文献问答**：点选一行提问，`Ctrl/⌘ + 点击`多选可合并对比问答。
+- **翻译**：一键把标题/研究问题/方法/结论/总结译成中文（可撤销恢复原文）。
+- **引用**：GB/T 7714 与 APA，一键复制。
+- **导入导出**：导出 CSV（Excel 直开）/ Markdown / JSON 备份（含全文），支持备份导入恢复。
+- **链接导入**：粘贴 arXiv 链接自动下载 PDF；粘贴 DOI 自动取 Crossref 元数据。
+- **Zotero 联动**：在 Zotero 里点选文献，页面自动抓取并分析（见 §7）。
+- **暗黑模式**、隐私优先（数据不出本机）。
 
-- 📄 **PDF → 结构化表格**：自动提取 标题 / 作者 / 年份 / 关键词 / 研究问题 / 研究方法 / 数据样本 / 主要结论 / 创新点 / 局限性 / 一句话总结
-- 🖱 **拖拽批量处理**：多选或拖入多个 PDF，顺序自动分析，逐页显示解析进度；扫描件自动 OCR 兜底
-- 🔗 **arXiv / DOI 导入**：粘贴 arXiv 链接自动下载 PDF 分析；粘贴 DOI 自动从 Crossref 导入元数据
-- ✏️ **单元格双击编辑**：所有字段可直接修改，关键词 / 作者按逗号分隔，自动保存；悬停一键复制任意单元格
-- 📚 **引用一键复制**：按 GB/T 7714（国标）或 APA 格式复制单条引用，或整行 Markdown
-- 🔍 **筛选与搜索**：按标题 / 作者 / 关键词 / 内容模糊搜索，年份、关键词、状态三个下拉筛选
-- 🧩 **列显示开关**：14 列自由增减，默认精简显示，告别横向滚动
-- 🌐 **中英对照翻译**：一键把标题、结论、一句话总结译成中文，中文为主、原文小字对照，可随时取消
-- 💬 **文献问答**：基于选中文献全文提问，AI 只依据文献作答、不编造；**Ctrl+点击可多选文献合并问答**（跨文献对比）
-- 📊 **统计面板**：年份分布 + 高频关键词一目了然
-- 🔌 **Zotero 联动**：Zotero 中选中文献 → 自动抓取 PDF 与元数据 → 自动分析；已导入过的文献自动回填元数据
-- 📤 **多种导出**：CSV（Excel 直开）/ Markdown 表格 / JSON 完整备份（含全文），可导入恢复
-- 🌙 **深色模式**：一键切换，偏好自动记忆
-- 🎁 **示例数据**：空表一键加载 3 篇真实经典论文，零配置看效果
-- 🤖 **多 AI 服务商**：智谱 GLM（有免费模型）/ DeepSeek / 通义千问 / OpenAI / Gemini / Claude，Key 与模型按服务商分别保存、随时切换
+## 4. 环境要求
 
-## 🚀 快速开始
+- **Node.js ≥ 18**（依赖内置 `fetch` 与 `AbortSignal.timeout`；推荐 20 / 22）。
+- 无需 Python。
+- 浏览器 Chrome / Edge / Firefox / Safari 均可。
 
-### 方式一：下载 exe（推荐，Windows）
-
-到 [Releases](../../releases) 页面下载 `SiftLit.exe`，双击即用：
-
-1. 自动启动本地服务并打开工具页面
-2. 右上角「⚙ 设置」填入任一服务商的 API Key（如 [智谱 GLM](https://open.bigmodel.cn)，glm-4-flash 系列免费）
-3. 把 PDF 拖进页面，开始分析
-
-### 方式二：源码运行
-
-需要 Python 3.8+（服务端零第三方依赖）：
+## 5. 快速开始
 
 ```bash
-git clone https://github.com/esimyok/SiftLit.git
-cd SiftLit
-python app.py        # 自动打开 http://127.0.0.1:3002
+# 1) 安装依赖（postinstall 会自动把 tesseract 的 worker/wasm 拷到 public/ocr）
+npm install
+
+# 2) 下载 OCR 语言包（中文 + 英文，约 31MB；离线 OCR 必需，见 §6）
+npm run ocr:fetch
+
+# 3) 启动
+npm run dev          # 开发：http://localhost:5173 （页面 + 本地桥，单进程同源）
 ```
 
-### 方式三：纯静态使用
+生产部署：
 
-直接双击 `index.html` 也能用（拖拽上传、AI 分析、问答、导出均可用；Zotero 联动需要本地服务在运行）。
+```bash
+npm run build        # 产出 dist/
+npm start            # 托管 dist/ + 本地桥 → http://127.0.0.1:4173
+```
 
-## 🔌 Zotero 联动（一次性设置）
+也可用 `npm run preview` 预览构建产物（同样带桥）。
 
-1. Zotero 设置 → 高级 → 勾选「**允许其他应用程序与 Zotero 通信**」
-2. 开启「本地 API」（独立开关）：Zotero 菜单 → 工具 → 开发者 → Run JavaScript，粘贴运行：
+![深色主题](docs/screenshot-dark.png)
+
+## 6. OCR 语言包（重要）
+
+> **OCR 是用来处理非文本型PDF。** 大多数 PDF（由 Word/LaTeX 导出）自带文字层，pdf.js 直接抽取即可，无需 OCR。但**扫描件 / 图片型 PDF 本质是图片、没有可选中文字层**，pdf.js 抽不到字，此时才需要 tesseract.js 做光学字符识别（OCR）把图上的字变成文本。OCR 依赖"语言包"（每种语言一份模型），本项目内置英文（`eng`）与简体中文（`chi_sim`）。
+
+`public/ocr/` 下的 `worker.min.js` / `tesseract-core*.wasm.js` / `*.traineddata.gz` 都是**生成物，不入库**：
+
+- `npm install` 的 `postinstall` 负责拷 worker/wasm；
+- **语言包必须执行 `npm run ocr:fetch`**（或手动放入 `public/ocr/`）。
+
+缺失语言包时，文字层 PDF 不受影响，但**扫描件 OCR 首次会联网**从 CDN 拉取。详见 `public/ocr/README.md`。
+
+## 7. 使用说明
+
+1. **配置 AI Key**：右上角「设置」→ 选服务商 → 填 API Key 与模型 → 保存。默认智谱 GLM（`glm-4-flash` 系列免费）。
+2. **导入文献**：拖入 / 点击选择 PDF（可多选），或粘贴 arXiv / DOI 链接。
+3. 每条记录会经历「解析中 → AI 分析中 → 完成」，状态徽章带逐页进度条。
+4. **点选一行**打开右侧问答面板提问；`Ctrl/⌘ + 点击`多选可合并提问。
+5. **双击**任意单元格可就地编辑（`Ctrl/⌘ + Enter` 或失焦提交，`Esc` 取消）。
+6. 「导出」下拉可选 CSV / Markdown / JSON 备份；「列设置」控制行内列与明细字段。
+7. 右上角图标切换深色/浅色，选择会被记住。
+
+### Zotero 联动（可选）
+
+在 Zotero 里点选文献即自动分析。**一次性前置配置：**
+
+1. Zotero 正在运行，且「设置 → 高级」已勾选 **允许其他应用程序与 Zotero 通信**；
+2. 安装 **Better BibTeX** 插件（用于读取"当前选中项"，官方 API 无此接口）并重启 Zotero；
+3. 开启 Zotero 本地只读 API —— 菜单「工具 → 开发者 → Run JavaScript」执行后重启：
 
    ```js
    Zotero.Prefs.set("httpServer.localAPI.enabled", true)
    ```
 
-   然后重启 Zotero（等价操作：设置 → 高级 → 配置编辑器，搜索 `localAPI`，切为 `true`）
-3. 安装 [Better BibTeX](https://retorque.re/zotero-bibtex/) 插件（仅用于读取"当前选中项"）
+**使用**：页面右上角点「Zotero」→ 按钮变为"Zotero 监听中"→ 在 Zotero 中选中一篇**带 PDF 附件**的文献 → 约 2.5 秒内页面自动新增并分析。
 
-完成后双击 `SiftLit.exe`，在 Zotero 里点选文献，约 2~3 秒后自动开始分析。联动只访问本机 Zotero，数据不出本机。
+排错对照：
 
-## 🌐 CORS 兜底代理
+| 现象                 | 原因                 | 处理                    |
+| -------------------- | -------------------- | ----------------------- |
+| `zotero_offline`     | Zotero 未运行        | 启动 Zotero             |
+| `bbt_missing`        | Better BibTeX 未就绪 | 安装/重启 BBT           |
+| `local_api_disabled` | 本地 API 未开        | 按上面第 3 条开启后重启 |
+| `no_selection`       | 未选中条目           | 在 Zotero 里选一篇      |
+| `no_pdf`             | 条目没有 PDF 附件    | 为其挂上 PDF 附件       |
 
-个别 AI 服务商会拦截浏览器直连（CORS）。工具会自动降级重试，此时需在工具目录启动本地转发代理：
+> Zotero 的本地服务只监听 `127.0.0.1:23119`，桥也只接受本机来源的请求；外部网站无法读取你的 Zotero 数据。
 
-```bash
-npm install express
-node proxy.js       # 监听 localhost:3001，支持各服务商通用转发
+## 9. 目录结构
+
+```
+SiftLit-web-version/
+├── index.html              # Vite 入口
+├── vite.config.js          # 构建配置 + 桥中间件（dev/preview 同源提供桥）
+├── server/                 # Node 本地服务（生产与 dev 共用）
+│   ├── bridge.mjs          #   Zotero 联动 + /ai/<host> 同源转发
+│   ├── static.mjs          #   dist/ 静态托管（SPA fallback、穿越防护）
+│   └── index.mjs           #   生产入口：node server/index.mjs
+├── src/
+│   ├── main.js             # 入口：渲染骨架 + 启动
+│   ├── contract/           # 字段模型、错误码、校验
+│   ├── core/               # 状态 store、串行队列、运行时上下文、启动
+│   ├── storage/            # localStorage + IndexedDB（全文）
+│   ├── bridge/             # 桥客户端（http / none，按可用性切换）
+│   ├── ai/                 # 服务商表、请求客户端、响应解析
+│   ├── domain/             # 记录、PDF/OCR、arXiv·DOI、引用、导出
+│   ├── ui/                 # 骨架、行渲染、筛选、问答、设置、统计、Zotero
+│   └── styles/             # 设计令牌（明/暗）与组件样式
+├── scripts/                # postinstall 拷贝资源 / 语言包下载
+├── public/ocr/             # OCR 本地资源（生成物，不入库；只保留 README）
+├── docs/                   # 截图与 Logo
+└── dist/                   # 构建产物
 ```
 
-## 📁 目录结构
+## 10. 隐私与安全
 
-```
-SiftLit/
-├── app.py                 # 本地服务 + Zotero 桥接（Python 标准库实现，零依赖）
-├── index.html             # 主页面：表格 / 筛选 / 编辑 / 翻译 / 问答 / 设置（单文件，无构建）
-├── proxy.js               # CORS 兜底代理（Node + Express，可选）
-├── 使用说明.txt            # 面向 exe 用户的离线说明
-├── packaging/
-│   └── SiftLit.spec     # PyInstaller 打包配置
-└── docs/                  # 截图等文档资源
-```
+- API Key 只存浏览器 `localStorage`，由本地服务转发给你所选的服务商，不经任何第三方中转。
+- 表格数据存 `localStorage`、PDF 全文存 `IndexedDB`，均在你自己机器上。
+- `/ai` 转发带 **服务商域名白名单**，且桥仅接受本机来源请求，避免被当作开放代理。
 
-## 🛠 自行打包 exe
+## 11. 常见问题
 
-```bash
-pip install pyinstaller
-python -m PyInstaller packaging/SiftLit.spec --distpath . --workpath build --noconfirm
-```
+- **AI 报"浏览器直连被 CORS 拦截"**：说明没通过本地服务打开页面。请用 `npm run dev` 或 `npm run build && npm start`，而不是直接打开 `dist/index.html`。
+- **页面能开但没有 Zotero**：确认是按本地服务方式启动的（静态托管模式无法访问本机 Zotero）。
+- **扫描件 OCR 卡住/失败**：确认已执行 `npm run ocr:fetch`。
+- **表格数据丢失**：浏览器存储配额超限时会提示，请及时用「导出 → 备份(JSON)」。
 
-生成单文件 `SiftLit.exe`（内嵌 index.html，拷走即可用）。
+## 12. 许可证
 
-## 🔒 隐私与数据
-
-- 表格数据保存在浏览器 localStorage，PDF **全文**保存在浏览器 IndexedDB——均仅存本机；建议定期「导出 → 备份(JSON)」以防浏览器清理数据；
-- PDF 文本只发送给你在设置中选择的那一家 AI 服务商，用于完成分析；arXiv 导入会从 arxiv.org 下载 PDF，DOI 导入会访问 api.crossref.org；
-- Zotero 联动仅访问本机 Zotero 服务（127.0.0.1）；本机服务只接受本机来源的请求（Origin 白名单），其他网站无法读取；
-- 项目本身不含任何遥测 / 统计。
-
-## 📄 License
-
-[MIT](LICENSE)
+沿用主项目许可证：**MIT License © 2026 PaperLens Authors**。
+（若本目录缺少 `LICENSE` 文件，请从主版本拷贝一份以保持完整。）

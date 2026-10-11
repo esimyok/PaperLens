@@ -1,0 +1,31 @@
+/* ================= Design Tokens（对齐原版 v2 重设计） ================= */
+:root{
+  --bg:#F6F4EF; --surface:#FFFFFF; --surface-2:#FAF9F5;
+  --ink:#22252B; --ink-2:#5B6472; --ink-3:#98A0AC;
+  --line:#E7E4DC; --line-strong:#D6D2C6;
+  --primary:#35549E; --primary-hover:#2B4686; --primary-ink:#35549E; --primary-weak:#EAEFF8;
+  --on-primary:#FFFFFF;
+  --mark:#FFF6C9; --mark-bar:#E7B93C;
+  --ok:#217A4B; --ok-bg:#E3F2E8;
+  --err:#B93826; --err-bg:#F9E9E6;
+  --warn:#A9640A; --warn-bg:#FBF1DC;
+  --code-bg:#F1EFE9;
+  --shadow-2:0 8px 24px rgba(28,30,34,.12);
+  --r-1:6px; --r-2:10px; --r-3:14px;
+  --font-ui:system-ui,"Segoe UI","Microsoft YaHei UI","PingFang SC","Noto Sans SC",sans-serif;
+  --font-display:Georgia,"Times New Roman","STZhongsong",serif;
+  --font-mono:"Cascadia Code",Consolas,ui-monospace,monospace;
+}
+html[data-theme="dark"]{
+  --bg:#131519; --surface:#1B1E24; --surface-2:#232731;
+  --ink:#E8EAEE; --ink-2:#A6ADBB; --ink-3:#6E7684;
+  --line:#2B303A; --line-strong:#3B414D;
+  --primary:#4C6BD9; --primary-hover:#5F7BE0; --primary-ink:#9DB1FF; --primary-weak:#26314E;
+  --on-primary:#0F1424;
+  --mark:#3A3520; --mark-bar:#D2A72E;
+  --ok:#6FCF97; --ok-bg:#1D2E23;
+  --err:#F28C7D; --err-bg:#3B221D;
+  --warn:#E2A24C; --warn-bg:#362912;
+  --code-bg:#14171C;
+  --shadow-2:0 10px 28px rgba(0,0,0,.5);
+}
