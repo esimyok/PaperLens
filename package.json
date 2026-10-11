@@ -1,0 +1,21 @@
+{
+  "name": "siftlit",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "SiftLit — 隐私优先的 PDF 文献结构化提炼工具（Vite 前端工程 / npm 分支）",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "start": "node server/index.mjs",
+    "preview": "vite preview",
+    "postinstall": "node scripts/copy-ocr-assets.mjs",
+    "ocr:fetch": "node scripts/fetch-ocr-lang.mjs"
+  },
+  "dependencies": {
+    "pdfjs-dist": "^4",
+    "tesseract.js": "^5"
+  },
+  "devDependencies": {
+    "vite": "^5"
+  }
+}

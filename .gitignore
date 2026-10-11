@@ -1,24 +1,11 @@
-# Python
-__pycache__/
-*.py[cod]
-
-# PyInstaller 构建产物（exe 发布走 GitHub Releases）
-build/
-dist/
-
-# 打包出的可执行文件不入库
-SiftLit.exe
-
-# 本地运行残留
-wecom_sync_pending.jsonl
-build_log.txt
-run_test.txt
-
-# 个人本地工具目录
-.workbuddy/
-
-# Node（proxy.js 使用方）
 node_modules/
-"release_payload.json"  
-"release_resp.json"  
-"_rels.json"  
+dist/
+*.log
+.DS_Store
+
+# OCR 本地资源：均为生成物，不入库（README.md 保留，说明获取方式）
+#   worker/wasm ← npm install 的 postinstall（scripts/copy-ocr-assets.mjs）
+#   语言包      ← npm run ocr:fetch（scripts/fetch-ocr-lang.mjs）
+public/ocr/worker.min.js
+public/ocr/tesseract-core*.wasm.js
+public/ocr/*.traineddata.gz
